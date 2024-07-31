@@ -18,7 +18,7 @@ public class Insertion {
     final static String COMPOUND_DELIM = "*";
     private final ArrayList<String> dirsToExclude;
     private final String path;
-    final static String junkInstrFileName = "/it/unibz/obfuscationapi/JunkInsertion/Insertion/junk_instr.txt";
+    final static String junkInstrFileName = "src/it/unibz/obfuscationapi/JunkInsertion/Insertion/junk_instr.txt";
 
     private final ArrayList<String> junkInstr;
 
@@ -55,16 +55,19 @@ public class Insertion {
         ArrayList<String> als = new ArrayList<>();
         File junkInstrFile = new File(junkInstrFileName);
         Scanner scanner = new Scanner(junkInstrFile);
-        StringBuilder instr = new StringBuilder();
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
-            if (line.equalsIgnoreCase(COMPOUND_DELIM)) {
-                if (!instr.isEmpty()) {
-                    als.add(instr.toString());
-                }
-                instr = new StringBuilder();
+            if (!line.equalsIgnoreCase(COMPOUND_DELIM)) {
+                als.add(line + LS);
             } else {
-                instr.append(line).append(LS);
+                StringBuilder compInstr = new StringBuilder();
+                while (scanner.hasNextLine()) {
+                    line = scanner.nextLine();
+                    if (line.equalsIgnoreCase(COMPOUND_DELIM))
+                        break;
+                    compInstr.append(line).append(LS);
+                }
+                als.add(compInstr.toString());
             }
         }
         scanner.close();
@@ -223,6 +226,4 @@ public class Insertion {
         return toRet + LS;
     }
 
-
 }
-

@@ -4,6 +4,7 @@ import it.unibz.obfuscationapi.Utility.Utilities;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,10 +16,20 @@ public class NopToJunk {
     final String COMPOUND_DELIM = "*";
     final ArrayList<String> dirsToExclude;
     final String path;
-    final String junkInstrFileName = "/it/unibz/obfuscationapi/JunkInsertion/NopToJunk/junk_instr.txt";
+    final String junkInstrFileName = "src/it/unibz/obfuscationapi/JunkInsertion/NopToJunk/junk_instr.txt";
     final String TO_SUBSTITUTE = "nop" + LS;
 
     private static ArrayList<ArrayList<String>> junkInstr;
+
+    public NopToJunk(String path) {
+        dirsToExclude = new ArrayList<>(List.of("android"));
+        this.path = path;
+        try {
+            junkInstr = loadJunkInstr();
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public NopToJunk(ArrayList<String> dirsToExclude, String path) {
         this.dirsToExclude = dirsToExclude;
@@ -44,7 +55,7 @@ public class NopToJunk {
                 }
                 instr = new ArrayList<>();
             } else {
-                instr.add(line + LS);
+                instr.add(line);
             }
         }
         scanner.close();
