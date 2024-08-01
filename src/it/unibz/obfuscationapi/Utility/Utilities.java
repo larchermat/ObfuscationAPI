@@ -10,10 +10,14 @@ public class Utilities {
     public final static char TAB = '\t';
     public final static String LS = System.lineSeparator();
     public final static String SEPARATOR = File.separator;
+    private final static Random RANDOM = new Random();
+
+    public static int randInt(int max) {
+        return randInt(0, max);
+    }
 
     public static int randInt(int min, int max) {
-        Random rand = new Random();
-        return rand.nextInt((max - min) + 1) + min;
+        return RANDOM.nextInt((max - min) + 1) + min;
     }
 
     /**
@@ -45,9 +49,10 @@ public class Utilities {
 
     /**
      * Returns file contents as a string buffer
+     *
      * @param pathName path of the file
      * @return StringBuffer containing the file contents
-     * @throws FileNotFoundException if the file does not exist or isn't found
+     * @throws FileNotFoundException        if the file does not exist or isn't found
      * @throws UnsupportedEncodingException if the named charset is not supported
      */
     public static StringBuffer getStringBufferFromFile(String pathName) throws FileNotFoundException, UnsupportedEncodingException {
@@ -63,5 +68,56 @@ public class Utilities {
         scanner.close();
 
         return copy;
+    }
+
+    /**
+     * Generates a random string of a given length using a given charset, alternatively using lower and upper case chars
+     * if no other charset is provided
+     *
+     * @param stringLen length of the random string
+     * @param charset   charset to use to generate the random string, if null or an empty string is given, the default
+     *                  charset is used
+     * @return the resulting random string
+     */
+    public static String generateRandomString(int stringLen, String charset) {
+        if (charset == null || charset.isEmpty()) {
+            charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        }
+        StringBuilder builder = new StringBuilder(stringLen);
+        for (int i = 0; i < stringLen; i++) {
+            builder.append(charset.charAt(randInt(charset.length() - 1)));
+        }
+        return builder.toString();
+    }
+
+    public static ArrayList<File> searchFiles(File pathFile, String extension, ArrayList<String> dirsToInclude, ArrayList<String> dirsToExclude) {
+        return searchFiles(pathFile, extension, new ArrayList<>(), dirsToInclude, dirsToExclude);
+    }
+
+    public static ArrayList<File> searchFiles(File pathFile, String extension, ArrayList<File> fileList, ArrayList<String> dirsToInclude, ArrayList<String> dirsToExclude) {
+        File[] listFile = pathFile.listFiles();
+        if (listFile != null && extension != null) {
+            for (File file : listFile) {
+                if (file.isDirectory()) {
+                    searchFiles(file, extension, fileList, dirsToInclude, dirsToExclude);
+                } else {
+                    if (checkPath(dirsToInclude, dirsToExclude, file.getPath())) {
+                        if (file.getName().endsWith(extension)) {
+                            fileList.add(file);
+                        }
+                    }
+                }
+            }
+        }
+        return fileList;
+    }
+
+    public static boolean checkPath(ArrayList<String> toInclude, ArrayList<String> toExclude, String path) {
+        boolean containsOneToInclude = toInclude == null || toInclude.stream()
+                .anyMatch(path::contains);
+        boolean doesNotContainAnyToExclude = toExclude == null || toExclude.stream()
+                .noneMatch(path::contains);
+
+        return containsOneToInclude && doesNotContainAnyToExclude;
     }
 }
