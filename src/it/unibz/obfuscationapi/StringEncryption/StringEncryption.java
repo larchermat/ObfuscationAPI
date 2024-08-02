@@ -120,7 +120,8 @@ public class StringEncryption {
             String insert = "    invoke-static {" + matcher.group(3) +
                     "}, Lcom/123456789/Decrypter;->applyCaesar(Ljava/lang/String;)Ljava/lang/String;" + LS +
                     "    move-result-object " + matcher.group(3);
-            matcher.appendReplacement(nFile, matcher.group(1) + matcher.group(3) + matcher.group(4) + key + LS + insert);
+            String replacement = matcher.group(1) + matcher.group(3) + matcher.group(4) + key + LS + insert;
+            matcher.appendReplacement(nFile, replacement.replace("$", "\\$"));
             times++;
         }
         matcher.appendTail(nFile);

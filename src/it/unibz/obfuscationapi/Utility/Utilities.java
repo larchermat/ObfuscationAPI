@@ -120,4 +120,18 @@ public class Utilities {
 
         return containsOneToInclude && doesNotContainAnyToExclude;
     }
+
+    /**
+     * Shuffles elements in an ArrayList
+     * @param array ArrayList that will get reordered
+     */
+    public static <E> void shuffleArray(ArrayList<E> array) {
+        for (int i = array.size() - 1; i > 0; i--)
+        {
+            int index = RANDOM.nextInt(i + 1);
+            E a = array.get(index);
+            array.set(index, array.get(i));
+            array.set(i,a);
+        }
+    }
 }
