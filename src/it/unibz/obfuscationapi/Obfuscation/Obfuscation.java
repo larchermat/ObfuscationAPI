@@ -252,28 +252,88 @@ public class Obfuscation {
     }
 
     /**
-     * Counts the number of methods in a dex file
-     *
-     * @param dexDump path to the file containing the dexdump
-     * @return the number of methods declared in the files
+     * Counts all the methods inside a dex file
+     * Because dex files can be huge, storing a StringBuffer in memory with the whole content of the file could be
+     * detrimental to the speed of execution of the program if it occupies too much space; to avoid this, the dex file
+     * contents are read sequentially and analyzed one at a time
+     * With the current chunkSize we allocate 2MB of memory for the buffer to read from, and the StringBuilder will be
+     * around the same size, so we're occupying in total around 4MB of memory with the objects in this method
+     * @param dexDump string containing the path to the dex file
+     * @return
      * @throws FileNotFoundException
      * @throws UnsupportedEncodingException
      */
     public int countMethodsInDex(String dexDump) throws FileNotFoundException, UnsupportedEncodingException {
         HashSet<String> uniqueMethods = new HashSet<>();
-        StringBuffer dump = getStringBufferFromFile(dexDump);
         Pattern pattern = Pattern.compile("(Class #[0-9]+)(?s)(.*?)(source_file_idx.*?\\))");
-        Matcher matcher = pattern.matcher(dump);
+        try (BufferedReader reader = new BufferedReader(new FileReader(dexDump))) {
+            int chunkSize = 2097152;
+            char[] buffer = new char[chunkSize];
+            StringBuilder sb = new StringBuilder();
+            int charsRead;
+            while ((charsRead = reader.read(buffer, 0, chunkSize)) != -1) {
+                sb.append(buffer, 0, charsRead);
+                Matcher matcher;
+                // If the matcher does not find a match, then it means we might have a truncated match, so we continue
+                // reading until we find the match, or if we get to the end, it means that there is nothing left of
+                // interest to read
+                while (true) {
+                    matcher = pattern.matcher(sb.toString());
+                    if (matcher.find()) {
+                        break;
+                    } else {
+                        if ((charsRead = reader.read(buffer, 0, chunkSize)) != -1) {
+                            sb.append(buffer, 0, charsRead);
+                        } else {
+                            // If the matcher could not find the class regex, and we have finished reading the dex file
+                            // it means that in the rest of the file there are no more useful information for us
+                            return uniqueMethods.size();
+                        }
+                    }
+                }
+
+                countMethodsInDexChunk(sb, uniqueMethods);
+                int end = 0;
+                while (matcher.find())
+                    end = matcher.end();
+                // We need to ensure not to delete a truncated match inside the StringBuilder because if so, the
+                // information would get lost in the next iteration; because of this we delete everything until the end
+                // of the last match and keep the last part
+                sb.delete(0, end);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return uniqueMethods.size();
+    }
+    // 131072 is 16 and 817
+    // 262144 is 14 and 113
+    // 524288 is 9 and 639
+    // 1048576 is 7 and 12
+    // 2097152 is 5 and 649
+
+
+    /**
+     * Updates the HashSet provided adding all unique methods found in a chunk of the dex file
+     *
+     * @param dexChunk StringBuilder containing the chunk of the dex file to analyze
+     * @throws FileNotFoundException
+     * @throws UnsupportedEncodingException
+     */
+    public void countMethodsInDexChunk(StringBuilder dexChunk, HashSet<String> uniqueMethods) throws FileNotFoundException, UnsupportedEncodingException {
+        Pattern pattern = Pattern.compile("(Class #[0-9]+)(?s)(.*?)(source_file_idx.*?\\))");
+        Matcher matcher = pattern.matcher(dexChunk);
         while (matcher.find()) {
             String classBody = matcher.group(2);
-            pattern = Pattern.compile("Direct methods(?s)(.*)Virtual methods");
-            Matcher matcher1 = pattern.matcher(classBody);
+            Pattern pattern1 = Pattern.compile("Direct methods(?s)(.*)Virtual methods");
+            Matcher matcher1 = pattern1.matcher(classBody);
             String methods = "";
             if (matcher1.find()) {
+                classBody = classBody.substring(matcher1.start());
                 methods += matcher1.group(1);
             }
-            pattern = Pattern.compile("Virtual methods(?s)(.*)");
-            matcher1 = pattern.matcher(classBody);
+            pattern1 = Pattern.compile("Virtual methods(?s)(.*)");
+            matcher1 = pattern1.matcher(classBody);
             if (matcher1.find()) {
                 methods += matcher1.group(1);
             }
@@ -281,8 +341,8 @@ public class Obfuscation {
             // said dex, but also all references to external libraries, whose methods are counted towards the limit of
             // 65536 methods, so the methods we need to count can be in the form of declaration or invocation; because
             // methods can be invoked more than once, we count the methods using a set, not to have duplicates
-            pattern = Pattern.compile("((?s)\\(in (.*?;)\\).*?name.*?'(.*?)'.*?type.*?'(.*?)')|(invoke-.*?(L.*?;)\\.(.*?):(.*?) )");
-            matcher1 = pattern.matcher(methods);
+            pattern1 = Pattern.compile("((?s)\\(in (.*?;)\\).*?name.*?'(.*?)'.*?type.*?'(.*?)')|(invoke-.*?(L.*?;)\\.(.*?):(.*?) )");
+            matcher1 = pattern1.matcher(methods);
             while (matcher1.find()) {
                 String method;
                 if (matcher1.group(1) != null) {
@@ -293,7 +353,6 @@ public class Obfuscation {
                 uniqueMethods.add(method);
             }
         }
-        return uniqueMethods.size();
     }
 
 }
