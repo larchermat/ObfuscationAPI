@@ -1,5 +1,6 @@
 package it.unibz.obfuscationapi.StringEncryption;
 
+import it.unibz.obfuscationapi.Transformation.Transformation;
 import it.unibz.obfuscationapi.Utility.Utilities;
 
 import java.io.*;
@@ -15,7 +16,7 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 /**
  * Class that applies the StringEncryption transformation to the decompiled smali files
  */
-public class StringEncryption {
+public class StringEncryption implements Transformation {
     private final ArrayList<String> dirsToExclude;
     private final String path;
     private final String decryptionSrcFile = Paths.get("src", "it", "unibz", "obfuscationapi", "StringEncryption", "Decryption.txt").toString();
@@ -25,17 +26,30 @@ public class StringEncryption {
      * @param dirsToExclude list of directories to exclude from the transformation
      * @param path path to the package of the APK
      */
-    public StringEncryption(ArrayList<String> dirsToExclude, String path) {
-        this.dirsToExclude = dirsToExclude;
+    public StringEncryption(String path, ArrayList<String> dirsToExclude) {
         this.path = path;
+        this.dirsToExclude = dirsToExclude;
     }
 
     /**
-     * Applies the encryption transformation
+     * Applies the transformation string encryption to the decompiled APK
      */
-    public void applyEncryption() {
+    @Override
+    public void obfuscate() {
         addDecryptionClass();
-        processFiles();
+        ArrayList<String> files;
+        try {
+            files = Utilities.navigateDirectoryContents(path, dirsToExclude);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        for (String file : files) {
+            try {
+                process(file);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     /**
@@ -82,25 +96,6 @@ public class StringEncryption {
         PrintStream ps = new PrintStream(new FileOutputStream(decryption));
         ps.print(text);
         ps.close();
-    }
-
-    /**
-     * Finds all files under the path directory and processes them
-     */
-    private void processFiles() {
-        ArrayList<String> files;
-        try {
-            files = Utilities.navigateDirectoryContents(path, dirsToExclude);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        for (String file : files) {
-            try {
-                process(file);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
     }
 
     /**

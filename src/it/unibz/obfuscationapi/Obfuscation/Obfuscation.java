@@ -1,5 +1,13 @@
 package it.unibz.obfuscationapi.Obfuscation;
 
+import it.unibz.obfuscationapi.CallIndirection.CallIndirection;
+import it.unibz.obfuscationapi.CodeReorder.CodeReorder;
+import it.unibz.obfuscationapi.IdentifierRenaming.IdentifierRenaming;
+import it.unibz.obfuscationapi.JunkInsertion.Insertion.Insertion;
+import it.unibz.obfuscationapi.JunkInsertion.NopToJunk.NopToJunk;
+import it.unibz.obfuscationapi.StringEncryption.StringEncryption;
+import it.unibz.obfuscationapi.Transformation.Transformation;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,14 +21,18 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 
 public class Obfuscation {
     private final String path;
+    private final String pkg;
     private final HashMap<String, ArrayList<File>> filesPerDir;
     private boolean isMultiDex;
     private final ArrayList<String> smaliDirs;
     private final ArrayList<String> dexDumps;
     private int limit;
+    private final ArrayList<Transformation> transformations;
 
-    public Obfuscation(String path) {
+    public Obfuscation(String path, String pkg) {
+        transformations = new ArrayList<>();
         this.path = path;
+        this.pkg = pkg;
         smaliDirs = new ArrayList<>();
         smaliDirs.add(path + SEPARATOR + "smali");
         setMultiDex();
@@ -36,12 +48,105 @@ public class Obfuscation {
         }
     }
 
-    public void setLimit() throws FileNotFoundException, UnsupportedEncodingException {
-        limit = 65534 - getMethodNumber();
+    public void addJunkCodeInsertion(ArrayList<String> dirsToExclude) {
+        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        Insertion insertion;
+        if (dirsToExclude != null)
+            insertion = new Insertion(pathToPackage.toString(), dirsToExclude);
+        else
+            insertion = new Insertion(pathToPackage.toString());
+        transformations.forEach(transformation -> {
+            if (transformation instanceof Insertion)
+                transformations.remove(transformation);
+        });
+        transformations.add(insertion);
     }
 
-    public int getLimit() {
-        return limit;
+    public void addNopToJunk(ArrayList<String> dirsToExclude) {
+        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        NopToJunk nopToJunk;
+        if (dirsToExclude != null)
+            nopToJunk = new NopToJunk(pathToPackage.toString(), dirsToExclude);
+        else
+            nopToJunk = new NopToJunk(pathToPackage.toString());
+        transformations.forEach(transformation -> {
+            if (transformation instanceof NopToJunk)
+                transformations.remove(transformation);
+        });
+        transformations.add(nopToJunk);
+    }
+
+    public void addStringEncryption(ArrayList<String> dirsToExclude) {
+        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        StringEncryption stringEncryption;
+        if (dirsToExclude != null)
+            stringEncryption = new StringEncryption(pathToPackage.toString(), dirsToExclude);
+        else
+            throw new RuntimeException("No list of directories to exclude provided when creating StringEncryption");
+        transformations.forEach(transformation -> {
+            if (transformation instanceof StringEncryption)
+                transformations.remove(transformation);
+        });
+        transformations.add(stringEncryption);
+    }
+
+    public void addIdentifierRenaming(String operation) {
+        Path pathToManifest = Paths.get(path, "AndroidManifest.xml");
+        IdentifierRenaming idRenaming = new IdentifierRenaming(
+                path, pathToManifest.toString(), Objects.requireNonNullElse(operation, "all"));
+        transformations.forEach(transformation -> {
+            if (transformation instanceof IdentifierRenaming)
+                transformations.remove(transformation);
+        });
+        transformations.add(idRenaming);
+    }
+
+    public void addCodeReorder(ArrayList<String> dirsToExclude) {
+        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        CodeReorder codeReorder;
+        if (dirsToExclude != null)
+            codeReorder = new CodeReorder(pathToPackage.toString(), dirsToExclude);
+        else
+            codeReorder = new CodeReorder(pathToPackage.toString());
+        transformations.forEach(transformation -> {
+            if (transformation instanceof CodeReorder)
+                transformations.remove(transformation);
+        });
+        transformations.add(codeReorder);
+    }
+
+    public void addCallIndirection(ArrayList<String> dirsToExclude) {
+        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        try {
+            setLimit();
+        } catch (FileNotFoundException | UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+        CallIndirection callIndirection;
+        if (dirsToExclude != null)
+            callIndirection = new CallIndirection(pathToPackage.toString(), limit, dirsToExclude);
+        else
+            callIndirection = new CallIndirection(pathToPackage.toString(), limit);
+        transformations.forEach(transformation -> {
+            if (transformation instanceof CallIndirection)
+                transformations.remove(transformation);
+        });
+        transformations.add(callIndirection);
+    }
+
+    public void applyTransformations() {
+        transformations.forEach(transformation -> {
+            try {
+                transformation.obfuscate();
+                System.out.println(transformation.getClass().getSimpleName() + " transformation concluded successfully");
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    public void setLimit() throws FileNotFoundException, UnsupportedEncodingException {
+        limit = 65534 - getMethodNumber();
     }
 
     /**
@@ -66,6 +171,7 @@ public class Obfuscation {
     /**
      * Generates the dumps of the dex files contained in the assembled APK and stores the path to them in
      * {@link Obfuscation#dexDumps dexDumps}
+     *
      * @throws InterruptedException
      * @throws IOException
      */
@@ -189,7 +295,5 @@ public class Obfuscation {
         }
         return uniqueMethods.size();
     }
-
-
 
 }

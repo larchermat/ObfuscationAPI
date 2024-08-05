@@ -1,5 +1,6 @@
 package it.unibz.obfuscationapi.CodeReorder;
 
+import it.unibz.obfuscationapi.Transformation.Transformation;
 import it.unibz.obfuscationapi.Utility.Utilities;
 
 import java.io.*;
@@ -12,7 +13,7 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 /**
  * Class that applies the code reordering transformation to the smali files
  */
-public class CodeReorder {
+public class CodeReorder implements Transformation {
     private final String path;
     private final ArrayList<String> dirsToExclude;
 
@@ -33,12 +34,14 @@ public class CodeReorder {
     public CodeReorder(String path, ArrayList<String> dirsToExclude) {
         this.path = path;
         this.dirsToExclude = dirsToExclude;
+        dirsToExclude.add("data");
     }
 
     /**
      * Collects the files in the {@link CodeReorder#path path} directory and applies the transformation to each one
      */
-    public void processFiles() {
+    @Override
+    public void obfuscate() {
         ArrayList<String> files;
         try {
             files = Utilities.navigateDirectoryContents(path, dirsToExclude);

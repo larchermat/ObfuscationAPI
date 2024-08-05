@@ -1,5 +1,6 @@
 package it.unibz.obfuscationapi.JunkInsertion.Insertion;
 
+import it.unibz.obfuscationapi.Transformation.Transformation;
 import it.unibz.obfuscationapi.Utility.Utilities;
 
 import java.io.*;
@@ -14,7 +15,7 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 /**
  * Applies insertion of junk instructions to smali files
  */
-public class Insertion {
+public class Insertion implements Transformation {
     final static String COMPOUND_DELIM = "*";
     private final ArrayList<String> dirsToExclude;
     private final String path;
@@ -22,7 +23,7 @@ public class Insertion {
 
     private final ArrayList<String> junkInstr;
 
-    private int tmpCntr = 0; // used to ensure the uniqueness of the jump labels
+    private int tmpCounter = 0; // used to ensure the uniqueness of the jump labels
 
     public Insertion(String path) {
         this.path = path;
@@ -76,9 +77,9 @@ public class Insertion {
     }
 
     /**
-     * Gathers the files under the path directory and processes them
+     * Applies the junk code insertion transformation to the decompiled APK
      */
-    public void processFiles() {
+    public void obfuscate() {
         ArrayList<String> files;
         try {
             files = Utilities.navigateDirectoryContents(path, dirsToExclude);
@@ -217,8 +218,8 @@ public class Insertion {
 
         Scanner sc1 = new Scanner(s);
         sc1.useDelimiter("TT");
-        String toRet = sc1.next() + "Target_" + tmpCntr + " " + sc1.next() + "Target_" + tmpCntr;
-        tmpCntr++;
+        String toRet = sc1.next() + "Target_" + tmpCounter + " " + sc1.next() + "Target_" + tmpCounter;
+        tmpCounter++;
 
         sc.close();
         sc1.close();

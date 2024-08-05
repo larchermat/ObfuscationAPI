@@ -1,5 +1,7 @@
 package it.unibz.obfuscationapi.CallIndirection;
 
+import it.unibz.obfuscationapi.Transformation.Transformation;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -11,7 +13,7 @@ import java.util.regex.Pattern;
 
 import static it.unibz.obfuscationapi.Utility.Utilities.*;
 
-public class CallIndirection {
+public class CallIndirection implements Transformation {
     private final String path;
     private final ArrayList<String> dirsToExclude;
     private final int limit;
@@ -29,6 +31,7 @@ public class CallIndirection {
         this.dirsToExclude = dirsToExclude;
     }
 
+    @Override
     public void obfuscate() throws IOException {
         ArrayList<String> files = navigateDirectoryContents(path, dirsToExclude);
         int numberMethod = 1;

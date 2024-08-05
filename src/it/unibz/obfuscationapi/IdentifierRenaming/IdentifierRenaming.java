@@ -1,8 +1,8 @@
 package it.unibz.obfuscationapi.IdentifierRenaming;
 
+import it.unibz.obfuscationapi.Transformation.Transformation;
+
 import java.io.*;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,7 +15,7 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 /**
  * Class that applies the renaming transformation: can rename the package of the application or the name of the classes
  */
-public class IdentifierRenaming {
+public class IdentifierRenaming implements Transformation {
 
     private final ArrayList<File> fileList = new ArrayList<>();
     private String packageIdentifier;
@@ -23,6 +23,7 @@ public class IdentifierRenaming {
     private final String path;
     private final String manifestPath;
     private StringBuffer manifestFile;
+    private String operation;
 
     /**
      *
@@ -42,11 +43,34 @@ public class IdentifierRenaming {
     }
 
     /**
+     *
+     * @param path path to the project's directory
+     * @param manifestPath path to the manifest of the project; can be an absolute path or the relative path from the
+     *                     project directory
+     * @param operation operation to perform on the files, either "renamePackage", "renameClass" or "all" for both
+     */
+    public IdentifierRenaming(String path, String manifestPath, String operation) {
+        this.path = path;
+        this.manifestPath = resolveFullPath(this.path, manifestPath);
+        try {
+            manifestFile = getStringBufferFromFile(this.manifestPath);
+        } catch (FileNotFoundException | UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+        setPackageIdentifier(manifestFile);
+        this.operation = operation;
+    }
+
+    public void setOperation(String operation) {
+        this.operation = operation;
+    }
+
+    /**
      * Applies the selected transformation to the project
-     * @param operation the operation to perform: "renamePackage", "renameClass" or "all"
      * @throws IOException
      */
-    public void applyTransformation(String operation) throws IOException {
+    @Override
+    public void obfuscate() throws IOException {
         if (!operation.equals("renamePackage") && !operation.equals("renameClass") && !operation.equals("all")) {
             throw new IOException(operation + " is not a supported operation");
         }

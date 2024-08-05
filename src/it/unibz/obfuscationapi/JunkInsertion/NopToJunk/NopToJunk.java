@@ -1,5 +1,6 @@
 package it.unibz.obfuscationapi.JunkInsertion.NopToJunk;
 
+import it.unibz.obfuscationapi.Transformation.Transformation;
 import it.unibz.obfuscationapi.Utility.Utilities;
 
 import java.io.*;
@@ -11,7 +12,7 @@ import java.util.regex.Pattern;
 
 import static it.unibz.obfuscationapi.Utility.Utilities.*;
 
-public class NopToJunk {
+public class NopToJunk implements Transformation {
 
     final String COMPOUND_DELIM = "*";
     final ArrayList<String> dirsToExclude;
@@ -31,7 +32,7 @@ public class NopToJunk {
         }
     }
 
-    public NopToJunk(ArrayList<String> dirsToExclude, String path) {
+    public NopToJunk(String path, ArrayList<String> dirsToExclude) {
         this.dirsToExclude = dirsToExclude;
         this.dirsToExclude.add("android");
         this.path = path;
@@ -63,7 +64,8 @@ public class NopToJunk {
         return als;
     }
 
-    public void processFiles() {
+    @Override
+    public void obfuscate() {
         ArrayList<String> files;
         try {
             files = Utilities.navigateDirectoryContents(path, dirsToExclude);
