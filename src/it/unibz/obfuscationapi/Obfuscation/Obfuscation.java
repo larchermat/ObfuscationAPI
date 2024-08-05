@@ -16,7 +16,8 @@ public class Obfuscation {
     private final HashMap<String, ArrayList<File>> filesPerDir;
     private boolean isMultiDex;
     private final ArrayList<String> smaliDirs;
-    private ArrayList<String> dexDumps;
+    private final ArrayList<String> dexDumps;
+    private int limit;
 
     public Obfuscation(String path) {
         this.path = path;
@@ -33,6 +34,14 @@ public class Obfuscation {
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void setLimit() throws FileNotFoundException, UnsupportedEncodingException {
+        limit = 65534 - getMethodNumber();
+    }
+
+    public int getLimit() {
+        return limit;
     }
 
     /**
@@ -180,5 +189,7 @@ public class Obfuscation {
         }
         return uniqueMethods.size();
     }
+
+
 
 }

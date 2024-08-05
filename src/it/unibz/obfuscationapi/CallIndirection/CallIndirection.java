@@ -14,23 +14,30 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 public class CallIndirection {
     private final String path;
     private final ArrayList<String> dirsToExclude;
+    private final int limit;
 
-    public CallIndirection(String path) {
+    public CallIndirection(String path, int limit) {
         this.path = path;
+        this.limit = limit;
         dirsToExclude = new ArrayList<>();
         dirsToExclude.add("android");
     }
 
-    public CallIndirection(String path, ArrayList<String> dirsToExclude) {
+    public CallIndirection(String path, int limit, ArrayList<String> dirsToExclude) {
         this.path = path;
+        this.limit = limit;
         this.dirsToExclude = dirsToExclude;
     }
 
     public void obfuscate() throws IOException {
         ArrayList<String> files = navigateDirectoryContents(path, dirsToExclude);
         int numberMethod = 1;
+        HashMap<String, String> indirectMethods = new HashMap<>();
         for (String file : files) {
-            HashMap<String, Integer> indirectMethods = new HashMap<>();
+            int count = 0;
+            if (numberMethod >= limit) {
+                break;
+            }
             String currentClass;
             int numParameters, i;
             File f = new File(file);
@@ -39,14 +46,19 @@ public class CallIndirection {
             StringBuffer newFile = new StringBuffer();
             StringBuffer temp = new StringBuffer();
 
-            Pattern pattern = Pattern.compile("\\.class.* (L.*;)");
+            Pattern pattern = Pattern.compile("\\.class (.*) (L.*;)");
             Matcher matcher = pattern.matcher(fileCopy.toString());
 
+            // We want to know if the class is public, because if it isn't we can't keep the new methods introduced to
+            // reference them in other classes
+            boolean isPublic;
             if (matcher.find()) {
-                currentClass = matcher.group(1);
+                currentClass = matcher.group(2);
+                isPublic = matcher.group(1).contains("public");
             } else {
                 break;
             }
+            ArrayList<String> methodsAdded = new ArrayList<>();
 
             // group(1) is the type of invocation: static for static methods or virtual
             // group(2) contains the registers we're passing as parameters for the call
@@ -57,9 +69,7 @@ public class CallIndirection {
             // return type is void, else the return type is indicated by group(6))
             pattern = Pattern.compile("invoke-(virtual|static) (\\{.*}), (.*;)->(.*)\\((.*)\\)(V)?(.*)?");
             matcher = pattern.matcher(fileCopy.toString());
-            int count = 0;
-            while (matcher.find() && count < 2) {
-                count++;
+            while (matcher.find() && numberMethod < limit && count < 3) {
                 String invocationType = matcher.group(1);
                 String methodRegisters = matcher.group(2);
                 String methodClass = matcher.group(3);
@@ -67,21 +77,22 @@ public class CallIndirection {
                 String methodParameters = matcher.group(5);
                 String methodReturnType = matcher.group(6) != null ? matcher.group(6) : matcher.group(7);
                 String invocation = methodClass + "->" + methodName + "(" + methodParameters + ")" + methodReturnType;
-                int currentMethod = numberMethod;
                 boolean newMethod = true;
+                String method;
                 if (indirectMethods.containsKey(invocation)) {
-                    System.out.println("Duplicate invocation: " + invocation + " in class " + currentClass);
-                    numberMethod = indirectMethods.get(invocation);
+                    // System.out.println("Duplicate invocation: " + invocation + " in class " + currentClass);
+                    method = indirectMethods.get(invocation);
                     newMethod = false;
                 } else {
-                    indirectMethods.put(invocation, numberMethod);
+                    method = currentClass + "->method" + numberMethod + "(" + (invocationType.equals("virtual") ? methodClass : "") + methodParameters + ")" + methodReturnType;
+                    methodsAdded.add(invocation);
+                    indirectMethods.put(invocation, method);
                 }
+                String replacement = "invoke-static " + methodRegisters + ", " + method;
 
-                String replacement = "invoke-static " + methodRegisters + ", " + currentClass + "->method" + numberMethod + "(" + (invocationType.equals("virtual") ? methodClass : "") + methodParameters + ")" + methodReturnType;
                 matcher.appendReplacement(newFile, replacement.replace("$", "\\$"));
 
                 if (!newMethod) {
-                    numberMethod = currentMethod;
                     continue;
                 }
 
@@ -115,10 +126,16 @@ public class CallIndirection {
                     temp.append(TAB).append("move-result").append(returnType).append(LS);
                 }
                 temp.append(TAB).append("return").append(returnType);
-                temp.append(".end method").append(LS);
+                temp.append(".end method").append(LS).append(LS);
                 numberMethod++;
+                count++;
             }
 
+            if (!isPublic) {
+                // If the class isn't public we remove the invocations from the hash map, but only after having edited
+                // the current file so that we can reuse them inside the class
+                methodsAdded.forEach(indirectMethods::remove);
+            }
             matcher.appendTail(newFile);
 
             newFile.append(LS).append(temp);
