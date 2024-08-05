@@ -32,13 +32,7 @@ public class IdentifierRenaming {
      */
     public IdentifierRenaming(String path, String manifestPath) {
         this.path = path;
-        if (manifestPath.contains(path))
-            this.manifestPath = manifestPath;
-        else{
-            Path basePath = Paths.get(this.path);
-            Path fullPath = basePath.resolve(manifestPath).normalize();
-            this.manifestPath = fullPath.toString();
-        }
+        this.manifestPath = resolveFullPath(this.path, manifestPath);
         try {
             manifestFile = getStringBufferFromFile(this.manifestPath);
         } catch (FileNotFoundException | UnsupportedEncodingException e) {

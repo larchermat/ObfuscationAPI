@@ -95,7 +95,7 @@ public class CallIndirection {
                     returnType = "-wide v0" + LS;
                 } else {
                     locals = 1;
-                    if (methodReturnType.startsWith("L")) {
+                    if (methodReturnType.startsWith("L") || methodReturnType.startsWith("[")) {
                         returnType = "-object v0" + LS;
                     } else {
                         returnType = " v0" + LS;
@@ -123,7 +123,7 @@ public class CallIndirection {
 
             newFile.append(LS).append(temp);
 
-            FileOutputStream fos= new FileOutputStream(f);
+            FileOutputStream fos = new FileOutputStream(f);
             OutputStreamWriter out = new OutputStreamWriter(fos, CHAR_ENCODING);
             out.append(newFile.toString());
             out.close();

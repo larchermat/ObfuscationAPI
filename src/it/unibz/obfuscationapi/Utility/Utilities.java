@@ -1,6 +1,8 @@
 package it.unibz.obfuscationapi.Utility;
 
 import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Scanner;
@@ -11,6 +13,7 @@ public class Utilities {
     public final static String LS = System.lineSeparator();
     public final static String SEPARATOR = File.separator;
     private final static Random RANDOM = new Random();
+    public final static String methodPattern = "(\\.method (.*)\\n)(?s)(.*?)(\\.end method)";
 
     public static int randInt(int max) {
         return randInt(0, max);
@@ -132,6 +135,22 @@ public class Utilities {
             E a = array.get(index);
             array.set(index, array.get(i));
             array.set(i,a);
+        }
+    }
+
+    /**
+     * Resolves a full path for a directory when unsure if it is already a full path or a relative path to a base directory
+     * @param base the path of the parent directory
+     * @param dirPath the path of the directory we want the full path of
+     * @return string containing the full path leading to the directory
+     */
+    public static String resolveFullPath(String base, String dirPath) {
+        if (dirPath.contains(base))
+            return dirPath;
+        else{
+            Path basePath = Paths.get(base);
+            Path fullPath = basePath.resolve(dirPath).normalize();
+            return fullPath.toString();
         }
     }
 }
