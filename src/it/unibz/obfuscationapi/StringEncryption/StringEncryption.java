@@ -108,7 +108,7 @@ public class StringEncryption implements Transformation {
         StringBuffer text = getStringBufferFromFile(filePath);
         Pattern pattern = Pattern.compile("(const-string(/jumbo)? )([a-z][0-9]+)(, )(\".*\")");
         Matcher matcher = pattern.matcher(text.toString());
-        StringBuffer nFile = new StringBuffer();
+        StringBuilder nFile = new StringBuilder();
         int times = 0;
         while (matcher.find() && times <= 15) {
             String key = "\"" + applyCaesar(matcher.group(5).substring(1, matcher.group(5).length() - 1), 2) + "\"";

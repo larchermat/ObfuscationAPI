@@ -6,7 +6,7 @@ out/
 decompiled/
 apk.zip
 decomp/
-dump.txt
+dump**.txt
 
 ### Eclipse ###
 .apt_generated

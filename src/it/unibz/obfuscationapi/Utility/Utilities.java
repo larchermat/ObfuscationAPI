@@ -13,7 +13,6 @@ public class Utilities {
     public final static String LS = System.lineSeparator();
     public final static String SEPARATOR = File.separator;
     private final static Random RANDOM = new Random();
-    public final static String methodPattern = "(\\.method (.*)\\n)(?s)(.*?)(\\.end method)";
 
     public static int randInt(int max) {
         return randInt(0, max);

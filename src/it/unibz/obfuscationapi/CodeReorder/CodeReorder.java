@@ -70,7 +70,7 @@ public class CodeReorder implements Transformation {
 
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher = pattern.matcher(text.toString());
-        StringBuffer nFile = new StringBuffer();
+        StringBuilder nFile = new StringBuilder();
         while (matcher.find()) {
 
             //smali code directives will be rewritten in the new smali file

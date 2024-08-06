@@ -46,8 +46,8 @@ public class CallIndirection implements Transformation {
             File f = new File(file);
             StringBuffer fileCopy = getStringBufferFromFile(file);
 
-            StringBuffer newFile = new StringBuffer();
-            StringBuffer temp = new StringBuffer();
+            StringBuilder newFile = new StringBuilder();
+            StringBuilder temp = new StringBuilder();
 
             Pattern pattern = Pattern.compile("\\.class (.*) (L.*;)");
             Matcher matcher = pattern.matcher(fileCopy.toString());
