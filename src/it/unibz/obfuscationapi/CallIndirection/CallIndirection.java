@@ -49,19 +49,23 @@ public class CallIndirection implements Transformation {
             StringBuilder newFile = new StringBuilder();
             StringBuilder temp = new StringBuilder();
 
-            Pattern pattern = Pattern.compile("\\.class (.*) (L.*;)");
+            Pattern pattern = Pattern.compile("\\.class (.*) (L.*;)(?s).*\\.source \"(.*?)\"");
             Matcher matcher = pattern.matcher(fileCopy.toString());
 
             // We want to know if the class is public, because if it isn't we can't keep the new methods introduced to
             // reference them in other classes
+            String source;
             boolean isPublic;
             if (matcher.find()) {
                 currentClass = matcher.group(2);
                 isPublic = matcher.group(1).contains("public");
+                // If the class is not public we can't reference the methods we create from other classes, but because
+                // some big classes are divided in multiple smali files, we can still invoke a method of a non-public
+                // class if the current class has the same source
+                source = matcher.group(3);
             } else {
                 break;
             }
-            ArrayList<String> methodsAdded = new ArrayList<>();
 
             // group(1) is the type of invocation: static for static methods or virtual
             // group(2) contains the registers we're passing as parameters for the call
@@ -82,22 +86,24 @@ public class CallIndirection implements Transformation {
                 String invocation = methodClass + "->" + methodName + "(" + methodParameters + ")" + methodReturnType;
                 boolean newMethod = true;
                 String method;
-                if (indirectMethods.containsKey(invocation)) {
+                if (indirectMethods.containsKey(invocation) || indirectMethods.containsKey(source + invocation)) {
                     // System.out.println("Duplicate invocation: " + invocation + " in class " + currentClass);
                     method = indirectMethods.get(invocation);
+                    if (method == null)
+                        method = indirectMethods.get(source + invocation);
                     newMethod = false;
                 } else {
                     method = currentClass + "->method" + numberMethod + "(" + (invocationType.equals("virtual") ? methodClass : "") + methodParameters + ")" + methodReturnType;
-                    methodsAdded.add(invocation);
-                    indirectMethods.put(invocation, method);
+                    // We want to save the invocation including the source only if our class is not public, so only
+                    // classes with the same source can then invoke this method
+                    indirectMethods.put(isPublic ? invocation : source + invocation, method);
                 }
                 String replacement = "invoke-static " + methodRegisters + ", " + method;
 
                 matcher.appendReplacement(newFile, replacement.replace("$", "\\$"));
 
-                if (!newMethod) {
+                if (!newMethod)
                     continue;
-                }
 
                 int locals;
                 String returnType;
@@ -132,12 +138,6 @@ public class CallIndirection implements Transformation {
                 temp.append(".end method").append(LS).append(LS);
                 numberMethod++;
                 count++;
-            }
-
-            if (!isPublic) {
-                // If the class isn't public we remove the invocations from the hash map, but only after having edited
-                // the current file so that we can reuse them inside the class
-                methodsAdded.forEach(indirectMethods::remove);
             }
             matcher.appendTail(newFile);
 
