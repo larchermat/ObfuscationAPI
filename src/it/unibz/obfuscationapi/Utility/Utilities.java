@@ -126,28 +126,29 @@ public class Utilities {
 
     /**
      * Shuffles elements in an ArrayList
+     *
      * @param array ArrayList that will get reordered
      */
     public static <E> void shuffleArray(ArrayList<E> array) {
-        for (int i = array.size() - 1; i > 0; i--)
-        {
+        for (int i = array.size() - 1; i > 0; i--) {
             int index = RANDOM.nextInt(i + 1);
             E a = array.get(index);
             array.set(index, array.get(i));
-            array.set(i,a);
+            array.set(i, a);
         }
     }
 
     /**
      * Resolves a full path for a directory when unsure if it is already a full path or a relative path to a base directory
-     * @param base the path of the parent directory
+     *
+     * @param base    the path of the parent directory
      * @param dirPath the path of the directory we want the full path of
      * @return string containing the full path leading to the directory
      */
     public static String resolveFullPath(String base, String dirPath) {
         if (dirPath.contains(base))
             return dirPath;
-        else{
+        else {
             Path basePath = Paths.get(base);
             Path fullPath = basePath.resolve(dirPath).normalize();
             return fullPath.toString();

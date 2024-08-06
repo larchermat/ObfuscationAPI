@@ -21,13 +21,15 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 
 public class Obfuscation {
     private final String path;
-    private final String pkg;
+    private String pkg;
     private final HashMap<String, ArrayList<File>> filesPerDir;
     private boolean isMultiDex;
     private final ArrayList<String> smaliDirs;
     private final ArrayList<String> dexDumps;
     private int limit;
     private final ArrayList<Transformation> transformations;
+    private String os;
+    private String appName;
 
     public Obfuscation(String path, String pkg) {
         transformations = new ArrayList<>();
@@ -46,6 +48,39 @@ public class Obfuscation {
         } catch (InterruptedException | IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Obfuscation() throws IOException, InterruptedException {
+        transformations = new ArrayList<>();
+        System.out.println("Insert path to the APK (including the .apk file with extension)");
+        Scanner scanner = new Scanner(System.in);
+        String pathToApk = scanner.nextLine();
+        appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1, pathToApk.lastIndexOf("."));
+
+        os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            File file = new File(Paths.get("scripts", "win").toString());
+            String[] cmd = {"decompileAPK.cmd", pathToApk};
+            execCommand(cmd, file);
+        } else if (os.contains("mac")) {
+            File file = new File(Paths.get("scripts", "unix", "mac").toString());
+            String[] cmd = {"decompileAPK.sh", pathToApk};
+            execCommand(cmd, file);
+        } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            File file = new File(Paths.get("scripts", "unix", "linux").toString());
+            String[] cmd = {"decompileAPK.sh", pathToApk};
+            execCommand(cmd, file);
+        }
+        this.path = Paths.get("decompiled").toString();
+        setPkg();
+        smaliDirs = new ArrayList<>();
+        smaliDirs.add(path + SEPARATOR + "smali");
+        setMultiDex();
+        filesPerDir = new HashMap<>();
+        for (String dir : smaliDirs) {
+            filesPerDir.put(dir, searchFiles(new File(dir), ".smali", null, null));
+        }
+        dexDumps = new ArrayList<>();
     }
 
     public void addJunkCodeInsertion(ArrayList<String> dirsToExclude) {
@@ -143,6 +178,20 @@ public class Obfuscation {
                 throw new RuntimeException(e);
             }
         });
+    }
+
+    private void setPkg() {
+        String pathToManifest = Paths.get(path, "AndroidManifest.xml").toString();
+        StringBuffer sb = null;
+        try {
+            sb = getStringBufferFromFile(pathToManifest);
+        } catch (FileNotFoundException | UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+        Pattern pattern = Pattern.compile("(package=\")([a-zA-Z0-9.]*\\.)([a-zA-Z0-9]*)(\")");
+        Matcher matcher = pattern.matcher(sb.toString());
+        if (matcher.find())
+            pkg = (matcher.group(2) + matcher.group(3)).replace(".", "/");
     }
 
     public void setLimit() throws FileNotFoundException, UnsupportedEncodingException {
