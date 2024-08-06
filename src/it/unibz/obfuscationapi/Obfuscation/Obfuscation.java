@@ -28,36 +28,37 @@ public class Obfuscation {
     private final ArrayList<String> dexDumps;
     private int limit;
     private final ArrayList<Transformation> transformations;
-    private String os;
-    private String appName;
-
-    public Obfuscation(String path, String pkg) {
-        transformations = new ArrayList<>();
-        this.path = path;
-        this.pkg = pkg;
-        smaliDirs = new ArrayList<>();
-        smaliDirs.add(path + SEPARATOR + "smali");
-        setMultiDex();
-        filesPerDir = new HashMap<>();
-        for (String dir : smaliDirs) {
-            filesPerDir.put(dir, searchFiles(new File(dir), ".smali", null, null));
-        }
-        dexDumps = new ArrayList<>();
-        try {
-            generateDexDump();
-        } catch (InterruptedException | IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    private final String os;
+    private final String appName;
 
     public Obfuscation() throws IOException, InterruptedException {
         transformations = new ArrayList<>();
         System.out.println("Insert path to the APK (including the .apk file with extension)");
         Scanner scanner = new Scanner(System.in);
         String pathToApk = scanner.nextLine();
-        appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1, pathToApk.lastIndexOf("."));
-
+        appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1);
         os = System.getProperty("os.name").toLowerCase();
+        decompileAPK(pathToApk);
+        path = Paths.get("decompiled").toString();
+        setPkg();
+        smaliDirs = new ArrayList<>();
+        smaliDirs.add(path + SEPARATOR + "smali");
+        dexDumps = new ArrayList<>();
+        setMultiDex();
+        filesPerDir = new HashMap<>();
+        for (String dir : smaliDirs) {
+            filesPerDir.put(dir, searchFiles(new File(dir), ".smali", null, null));
+        }
+    }
+
+    /**
+     * Executes the scripts in the scripts folder to decompile the APK and generate the dumps of the dex files
+     *
+     * @param pathToApk path to the original APK to decompile
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    private void decompileAPK(String pathToApk) throws IOException, InterruptedException {
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "decompileAPK.cmd", pathToApk};
@@ -74,16 +75,32 @@ public class Obfuscation {
             if (execCommand(cmd, file) != 0)
                 throw new RuntimeException("Linux command \"" + String.join("", cmd) + "\" failed");
         }
-        this.path = Paths.get("decompiled").toString();
-        setPkg();
-        smaliDirs = new ArrayList<>();
-        smaliDirs.add(path + SEPARATOR + "smali");
-        dexDumps = new ArrayList<>();
-        setMultiDex();
-        filesPerDir = new HashMap<>();
-        for (String dir : smaliDirs) {
-            filesPerDir.put(dir, searchFiles(new File(dir), ".smali", null, null));
+    }
+
+    /**
+     * Executes the scripts in the scripts folder to rebuild and sign the APK
+     *
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void rebuildAPK() throws IOException, InterruptedException {
+        if (os.contains("win")) {
+            File file = new File(Paths.get("scripts", "win").toString());
+            String[] cmd = {"cmd.exe", "/c", "rebuildAPK.cmd", appName};
+            if (execCommand(cmd, file) != 0)
+                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
+        } else {
+            File file = new File(Paths.get("scripts", "unix").toString());
+            String[] cmd = {"bash", "rebuildAPK.sh", appName};
+            if (execCommand(cmd, file) != 0)
+                throw new RuntimeException("Unix command \"" + String.join(" ", cmd) + "\" failed");
         }
+    }
+
+    private int execCommand(String[] args, File file) throws IOException, InterruptedException {
+        Runtime rt = Runtime.getRuntime();
+        Process pr = rt.exec(args, null, file);
+        return pr.waitFor();
     }
 
     public void addJunkCodeInsertion(ArrayList<String> dirsToExclude) {
@@ -185,7 +202,7 @@ public class Obfuscation {
 
     private void setPkg() {
         String pathToManifest = Paths.get(path, "AndroidManifest.xml").toString();
-        StringBuffer sb = null;
+        StringBuffer sb;
         try {
             sb = getStringBufferFromFile(pathToManifest);
         } catch (FileNotFoundException | UnsupportedEncodingException e) {
@@ -203,12 +220,11 @@ public class Obfuscation {
 
     /**
      * Determines if the project is multidex and adds the directories containing the smali files to
-     * {@link Obfuscation#smaliDirs smaliDirs}
+     * {@link Obfuscation#smaliDirs smaliDirs} and the dumps of the dex files to {@link Obfuscation#dexDumps dexDumps}
      */
     private void setMultiDex() {
         isMultiDex = false;
         Path base = Paths.get(path);
-        System.out.println(base);
         int i = 2;
         Path dir;
         do {
@@ -222,55 +238,6 @@ public class Obfuscation {
         for (i = 1; i <= smaliDirs.size(); i++) {
             dexDumps.add(dexDump.resolve("dump" + i + ".txt").toString());
         }
-    }
-
-    /**
-     * Generates the dumps of the dex files contained in the assembled APK and stores the path to them in
-     * {@link Obfuscation#dexDumps dexDumps}
-     *
-     * @throws InterruptedException
-     * @throws IOException
-     */
-    private void generateDexDump() throws InterruptedException, IOException {
-        // TODO: implement so that this part can be run by any system
-        File workingDir = new File(path + SEPARATOR + "dist");
-        Path dump = Paths.get(path, "dist");
-        if (!Files.exists(dump.resolve("app-release.apk")))
-            throw new FileNotFoundException("app-release.apk not found in directory: " + dump);
-        if (!Files.exists(dump.resolve("app-release.zip"))) {
-            String[] cmd1 = {"cp", "app-release.apk", "app-release.zip"};
-            if (execCommand(cmd1, workingDir) != 0)
-                throw new RuntimeException("Command failed: " + String.join(" ", cmd1));
-            System.out.println("cp succeeded");
-        }
-        if (!Files.exists(dump.resolve("decomp"))) {
-            String[] cmd2 = {"unzip", "app-release.zip", "-d", "decomp"};
-            if (execCommand(cmd2, workingDir) != 0)
-                throw new RuntimeException("Command failed: " + String.join(" ", cmd2));
-            System.out.println("unzip succeeded");
-        }
-        for (int i = 1; i <= smaliDirs.size(); i++) {
-            String dexDumpNum = i == 1 ? "" : String.valueOf(i);
-            String[] cmd3 = {"/bin/sh", "-c", "~/Library/Android/sdk/build-tools/35.0.0/dexdump -d decomp/classes" + dexDumpNum + ".dex > dump" + dexDumpNum + ".txt"};
-            if (execCommand(cmd3, workingDir) != 0)
-                throw new RuntimeException("Command failed: " + String.join(" ", cmd3));
-            System.out.println("dexdump " + i + " succeeded");
-            dexDumps.add(Paths.get(path, "dist", "dump" + dexDumpNum + ".txt").toString());
-        }
-        String[] cmd4 = {"rm", "app-release.zip"};
-        if (execCommand(cmd4, workingDir) != 0)
-            throw new RuntimeException("Command failed: " + String.join(" ", cmd4));
-        System.out.println("first rm succeeded");
-        String[] cmd5 = {"rm", "-r", "decomp"};
-        if (execCommand(cmd5, workingDir) != 0)
-            throw new RuntimeException("Command failed: " + String.join(" ", cmd5));
-        System.out.println("second rm succeeded");
-    }
-
-    private int execCommand(String[] args, File file) throws IOException, InterruptedException {
-        Runtime rt = Runtime.getRuntime();
-        Process pr = rt.exec(args, null, file);
-        return pr.waitFor();
     }
 
     /**
