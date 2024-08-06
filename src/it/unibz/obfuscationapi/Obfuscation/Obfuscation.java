@@ -60,27 +60,30 @@ public class Obfuscation {
         os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"decompileAPK.cmd", pathToApk};
-            execCommand(cmd, file);
+            String[] cmd = {"cmd.exe", "/c", "decompileAPK.cmd", pathToApk};
+            if (execCommand(cmd, file) != 0)
+                throw new RuntimeException("Windows command \"" + String.join("", cmd) + "\" failed");
         } else if (os.contains("mac")) {
             File file = new File(Paths.get("scripts", "unix", "mac").toString());
-            String[] cmd = {"decompileAPK.sh", pathToApk};
-            execCommand(cmd, file);
+            String[] cmd = {"bash", "decompileAPK.sh", pathToApk};
+            if (execCommand(cmd, file) != 0)
+                throw new RuntimeException("Mac command \"" + String.join("", cmd) + "\" failed");
         } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             File file = new File(Paths.get("scripts", "unix", "linux").toString());
-            String[] cmd = {"decompileAPK.sh", pathToApk};
-            execCommand(cmd, file);
+            String[] cmd = {"bash", "decompileAPK.sh", pathToApk};
+            if (execCommand(cmd, file) != 0)
+                throw new RuntimeException("Linux command \"" + String.join("", cmd) + "\" failed");
         }
         this.path = Paths.get("decompiled").toString();
         setPkg();
         smaliDirs = new ArrayList<>();
         smaliDirs.add(path + SEPARATOR + "smali");
+        dexDumps = new ArrayList<>();
         setMultiDex();
         filesPerDir = new HashMap<>();
         for (String dir : smaliDirs) {
             filesPerDir.put(dir, searchFiles(new File(dir), ".smali", null, null));
         }
-        dexDumps = new ArrayList<>();
     }
 
     public void addJunkCodeInsertion(ArrayList<String> dirsToExclude) {
@@ -215,6 +218,10 @@ public class Obfuscation {
             if (Files.exists(dir))
                 smaliDirs.add(dir.toString());
         } while (Files.exists(dir));
+        Path dexDump = Paths.get("");
+        for (i = 1; i <= smaliDirs.size(); i++) {
+            dexDumps.add(dexDump.resolve("dump" + i + ".txt").toString());
+        }
     }
 
     /**
@@ -307,6 +314,7 @@ public class Obfuscation {
      * contents are read sequentially and analyzed one at a time
      * With the current chunkSize we allocate 2MB of memory for the buffer to read from, and the StringBuilder will be
      * around the same size, so we're occupying in total around 4MB of memory with the objects in this method
+     *
      * @param dexDump string containing the path to the dex file
      * @return
      * @throws FileNotFoundException

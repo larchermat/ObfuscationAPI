@@ -1,5 +1,7 @@
 @echo off
 
+setlocal enabledelayedexpansion
+
 if "%1"=="" (
   echo Usage: %0 path-to-APK
   exit /b 1
@@ -7,14 +9,29 @@ if "%1"=="" (
 
 set p=%1
 
-java -jar ..\..\apktool\apktool.jar d "%p%" -o ..\..\decompiled
+set "basePath=..\.."
 
-copy "%p%" ..\..\apk.zip
+java -jar "%basePath%\apktool\apktool.jar" d "%p%" -o "%basePath%\decompiled"
 
-powershell -command "Expand-Archive -Path ..\..\apk.zip -DestinationPath ..\..\decomp"
+copy "%p%" %basePath%\apk.zip
 
-..\..\dexdump\win\dexdump -d ..\..\decomp\classes.dex > ..\..\dump.txt
+powershell -command "Expand-Archive -Path %basePath%\apk.zip -DestinationPath %basePath%\decomp"
 
-del ..\..\apk.zip
+set "dexFiles="
 
-rmdir /s /q ..\..\decomp
+for /f "delims=" %%f in ('dir /b %basePath%\decomp\*classes*') do (
+  set "dexFiles=!dexFiles! %%f"
+)
+
+set i=1
+
+for %%f in (!dexFiles!) do (
+  "%basePath%\dexdump\win\dexdump" -d "%basePath%\decomp\%%f" > "%basePath%\dump!i!.txt"
+  set /a i+=1
+)
+
+del "%basePath%\apk.zip"
+
+rmdir /s /q "%basePath%\decomp"
+
+endlocal

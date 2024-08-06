@@ -1,8 +1,14 @@
 @echo off
 
-echo APK name
-set /p p=
+if "%1"=="" (
+  echo Usage: %0 name-of-application
+  exit /b 1
+)
 
-java -jar ..\..\apktool\apktool.jar b ..\..\decompiled --use-aapt2 --debug
+set p=%1
 
-java -jar ..\..\apksigner\uber-apk-signer-1.3.0.jar -a ..\..\decompiled\dist\%p% --allowResign --overwrite
+set "basePath=..\.."
+
+java -jar "%basePath%\apktool\apktool.jar" b "%basePath%\decompiled" --use-aapt2 --debug
+
+java -jar "%basePath%\apksigner\uber-apk-signer-1.3.0.jar" -a "%basePath%\decompiled\dist\%p%" --allowResign --overwrite
