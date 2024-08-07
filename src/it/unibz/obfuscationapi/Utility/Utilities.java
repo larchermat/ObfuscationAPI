@@ -4,15 +4,20 @@ import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Random;
 import java.util.Scanner;
 
+/**
+ * Class containing static fields and methods useful in multiple transformations
+ */
 public class Utilities {
     public final static String CHAR_ENCODING = "UTF-8";
     public final static char TAB = '\t';
     public final static String LS = System.lineSeparator();
     public final static String SEPARATOR = File.separator;
     private final static Random RANDOM = new Random();
+    private final static String pathOfProject = Paths.get("").toAbsolutePath().toString();
 
     public static int randInt(int max) {
         return randInt(0, max);
@@ -39,9 +44,8 @@ public class Utilities {
         assert files != null;
         for (File file : files) {
             if (file.isDirectory()) {
-                if (!(dirsToExclude == null) && !dirsToExclude.isEmpty() && !dirsToExclude.contains(file.getName())) {
+                if (checkPath(null, dirsToExclude, file.getPath()))
                     navigateDirectoryContents(file, dirsToExclude, contents);
-                }
             } else {
                 contents.add(file.getCanonicalPath());
             }
@@ -92,33 +96,57 @@ public class Utilities {
         return builder.toString();
     }
 
-    public static ArrayList<File> searchFiles(File pathFile, String extension, ArrayList<String> dirsToInclude, ArrayList<String> dirsToExclude) {
-        return searchFiles(pathFile, extension, new ArrayList<>(), dirsToInclude, dirsToExclude);
+    /**
+     * Finds all files with a certain extension under a parent directory
+     * When the lists dirsToInclude and dirsToExclude are null, then no check is performed, otherwise, the path under
+     * which the files are searched needs to include at least one of the directories to include, and none of the ones to
+     * exclude
+     *
+     * @param dirPath      path of the parent directory in which the search is performed
+     * @param extension     extension of the files to find
+     * @param dirsToInclude list of directories of which at least one needs to be included in the path
+     * @param dirsToExclude list of directories of which none must be included in the path
+     * @return an arraylist containing all the file objects pointing to the files under the directory with the desired
+     * extension
+     */
+    public static ArrayList<File> searchFiles(File dirPath, String extension, ArrayList<String> dirsToInclude, ArrayList<String> dirsToExclude) {
+        return searchFiles(dirPath, extension, new ArrayList<>(), dirsToInclude, dirsToExclude);
     }
 
     public static ArrayList<File> searchFiles(File pathFile, String extension, ArrayList<File> fileList, ArrayList<String> dirsToInclude, ArrayList<String> dirsToExclude) {
-        File[] listFile = pathFile.listFiles();
-        if (listFile != null && extension != null) {
-            for (File file : listFile) {
+        File[] files = pathFile.listFiles();
+        if (files != null && extension != null) {
+            for (File file : files) {
                 if (file.isDirectory()) {
-                    searchFiles(file, extension, fileList, dirsToInclude, dirsToExclude);
+                    if (checkPath(dirsToInclude, dirsToExclude, file.getPath()))
+                        searchFiles(file, extension, fileList, dirsToInclude, dirsToExclude);
                 } else {
-                    if (checkPath(dirsToInclude, dirsToExclude, file.getPath())) {
-                        if (file.getName().endsWith(extension)) {
-                            fileList.add(file);
-                        }
-                    }
+                    if (file.getName().endsWith(extension))
+                        fileList.add(file);
                 }
             }
         }
         return fileList;
     }
 
+    /**
+     * Checks if the current path from the project folder onwards contains at least one (if any) of the directories to
+     * include and does not contain any (if any) of the directories to exclude
+     *
+     * @param toInclude list of directories of which at least one needs to be included in the path
+     * @param toExclude list of directories of which none must be included in the path
+     * @param path      path to be checked
+     * @return true if the path contains at least one directory of those to include and does not contain any of the ones
+     * to exclude, false otherwise
+     */
     public static boolean checkPath(ArrayList<String> toInclude, ArrayList<String> toExclude, String path) {
-        boolean containsOneToInclude = toInclude == null || toInclude.stream()
-                .anyMatch(path::contains);
-        boolean doesNotContainAnyToExclude = toExclude == null || toExclude.stream()
-                .noneMatch(path::contains);
+        path = path.replace(pathOfProject, "");
+        ArrayList<String> subDirs = (ArrayList<String>) Arrays.stream(path.split(SEPARATOR))
+                .toList();
+        boolean containsOneToInclude = toInclude == null || toInclude.isEmpty() || toInclude.stream()
+                .anyMatch(subDirs::contains);
+        boolean doesNotContainAnyToExclude = toExclude == null || toExclude.isEmpty() || toExclude.stream()
+                .noneMatch(subDirs::contains);
 
         return containsOneToInclude && doesNotContainAnyToExclude;
     }

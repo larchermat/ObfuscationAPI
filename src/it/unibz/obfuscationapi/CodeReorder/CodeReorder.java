@@ -41,19 +41,10 @@ public class CodeReorder implements Transformation {
      * Collects the files in the {@link CodeReorder#path path} directory and applies the transformation to each one
      */
     @Override
-    public void obfuscate() {
-        ArrayList<String> files;
-        try {
-            files = Utilities.navigateDirectoryContents(path, dirsToExclude);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+    public void obfuscate() throws IOException {
+        ArrayList<String> files = Utilities.navigateDirectoryContents(path, dirsToExclude);
         for (String file : files) {
-            try {
-                process(file);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
+            process(file);
         }
     }
 

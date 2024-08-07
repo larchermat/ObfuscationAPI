@@ -13,10 +13,19 @@ import java.util.regex.Pattern;
 
 import static it.unibz.obfuscationapi.Utility.Utilities.*;
 
-// TODO: try to move a whole class declaration (including the segments) from one dex to the other and add methods from there, avoiding cross dex invocations because it might count those methods towards the limit
-
+/**
+ * Class that applies the call indirection transformation: it scans the files contained in the smali directories of the
+ * decompiled APK replacing the invocations to methods with the invocation to a new method, that performs the original
+ * invocation instead.
+ */
 public class CallIndirection implements Transformation {
     private final ArrayList<String> dirsToExclude;
+    /*
+     * To apply the transformation and not break the APK, the class need to keep track of the limit of methods that can
+     * be added to files contained in a smali directory. All the classes in a smali directory will be compiled and
+     * indexed in a dex file, which can contain at most 65536 methods, so we save the directory to modify together with
+     * the number of methods that can be added in total
+     */
     private final HashMap<String, Integer> dirsByLimit;
 
     public CallIndirection(HashMap<String, Integer> dirsByLimit) {
@@ -32,21 +41,28 @@ public class CallIndirection implements Transformation {
         this.dirsToExclude = dirsToExclude;
     }
 
+    /**
+     * Applies the call indirection transformation to all files found under the smali directories avoiding the
+     * directories in {@link CallIndirection#dirsToExclude dirsToExclude}
+     *
+     * @throws IOException
+     */
     @Override
     public void obfuscate() throws IOException {
         for (String path : dirsByLimit.keySet()) {
             int limit = dirsByLimit.get(path);
             ArrayList<String> files = navigateDirectoryContents(path, dirsToExclude);
-            int numberMethod = 1;
+            int methodNumber = 1;
+            // We keep a hash map of all methods added paired with the call that they substitute, so that in case we
+            // find the same call in another file under the same smali folder we can reference the method already
+            // created, except for in some special cases (e.g. the class is not public, invocation passes registers
+            // containing private volatile fields)
             HashMap<String, String> indirectMethods = new HashMap<>();
             for (String file : files) {
-                int count = 0;
-                if (numberMethod >= limit) {
+                if (methodNumber >= limit) {
                     break;
                 }
-                String currentClass;
-                int numParameters, i;
-                File f = new File(file);
+
                 StringBuffer fileCopy = getStringBufferFromFile(file);
 
                 StringBuilder newFile = new StringBuilder();
@@ -55,19 +71,21 @@ public class CallIndirection implements Transformation {
                 Pattern pattern = Pattern.compile("\\.class (.*) (L.*;)(?s).*\\.source \"(.*?)\"");
                 Matcher matcher = pattern.matcher(fileCopy.toString());
 
-                // We want to know if the class is public, because if it isn't we can't keep the new methods introduced to
-                // reference them in other classes
-                String source;
-                boolean isPublic;
                 if (!matcher.find())
                     continue;
+
+                // We set a maximum of methods to be added to a class because me may hit the limit before we modify a
+                // reasonable number of classes if we substituted every method we found
+                int count = 0;
                 ArrayList<String> pVFields = getPrivateVolatileFields(fileCopy.toString());
-                currentClass = matcher.group(2);
-                isPublic = matcher.group(1).contains("public");
+                // We want to know if the class is public, because if it isn't we can't keep the new methods introduced to
+                // reference them in other classes
+                boolean isPublic = matcher.group(1).contains("public");
+                String currentClass = matcher.group(2);
                 // If the class is not public we can't reference the methods we create from other classes, but because
                 // some big classes are divided in multiple smali files, we can still invoke a method of a non-public
                 // class if the current class has the same source
-                source = matcher.group(3);
+                String source = matcher.group(3);
 
                 // group(1) is the type of invocation: static for static methods or virtual
                 // group(2) contains the registers we're passing as parameters for the call
@@ -78,7 +96,7 @@ public class CallIndirection implements Transformation {
                 // return type is void, else the return type is indicated by group(6))
                 pattern = Pattern.compile("invoke-(virtual|static) (\\{.*}), (.*;)->(.*)\\((.*)\\)(V)?(.*)?");
                 matcher = pattern.matcher(fileCopy.toString());
-                while (matcher.find() && numberMethod < limit && count < 3) {
+                while (matcher.find() && methodNumber < limit && count < 3) {
                     String invocationType = matcher.group(1);
                     String methodRegisters = matcher.group(2);
                     String methodClass = matcher.group(3);
@@ -96,7 +114,7 @@ public class CallIndirection implements Transformation {
                             method = indirectMethods.get(source + invocation);
                         newMethod = false;
                     } else {
-                        method = currentClass + "->method" + numberMethod + "(" + (invocationType.equals("virtual") ? methodClass : "") + methodParameters + ")" + methodReturnType;
+                        method = currentClass + "->method" + methodNumber + "(" + (invocationType.equals("virtual") ? methodClass : "") + methodParameters + ")" + methodReturnType;
                         // We want to save the invocation including the source only if our class is not public, so only
                         // classes with the same source can then invoke this method
                         indirectMethods.put(isPublic ? invocation : source + invocation, method);
@@ -125,12 +143,12 @@ public class CallIndirection implements Transformation {
                         }
                     }
 
-                    temp.append(".method public static method").append(numberMethod).append("(").append((invocationType.equals("virtual") ? methodClass : "")).append(methodParameters).append(")").append(methodReturnType).append(LS);
-                    numParameters = occurrences(methodRegisters);
+                    temp.append(".method public static method").append(methodNumber).append("(").append((invocationType.equals("virtual") ? methodClass : "")).append(methodParameters).append(")").append(methodReturnType).append(LS);
 
                     temp.append(TAB).append(".locals ").append(locals).append(LS).append(LS);
                     temp.append(TAB).append("invoke-").append(invocationType).append(" {");
-                    for (i = 0; i < numParameters; i++) {
+                    int numParameters = occurrences(methodRegisters);
+                    for (int i = 0; i < numParameters; i++) {
                         temp.append("p").append(i).append(i == numParameters - 1 ? "" : ", ");
                     }
                     temp.append("}, ").append(invocation).append(LS).append(LS);
@@ -139,25 +157,31 @@ public class CallIndirection implements Transformation {
                     }
                     temp.append(TAB).append("return").append(returnType);
                     temp.append(".end method").append(LS).append(LS);
-                    numberMethod++;
+                    methodNumber++;
                     count++;
                 }
                 matcher.appendTail(newFile);
 
                 newFile.append(LS).append(temp);
 
+                File f = new File(file);
                 FileOutputStream fos = new FileOutputStream(f);
                 OutputStreamWriter out = new OutputStreamWriter(fos, CHAR_ENCODING);
                 out.append(newFile.toString());
                 out.close();
             }
-            System.out.println("Number of methods added " + numberMethod);
+            System.out.println("Number of methods added " + methodNumber);
         }
     }
 
-    private int occurrences(String s) {
+    /**
+     * Counts how many registers are used in the invocation
+     * @param registers string containing all registers used in the invocation
+     * @return the number of registers used in the invocation
+     */
+    private int occurrences(String registers) {
         Pattern pattern = Pattern.compile("([pv][0-9]+)");
-        Matcher matcher = pattern.matcher(s);
+        Matcher matcher = pattern.matcher(registers);
         int i = 0;
         while (matcher.find()) {
             i++;
@@ -166,9 +190,12 @@ public class CallIndirection implements Transformation {
     }
 
     /**
-     * Finds and returns all
-     * @param classBody
-     * @return
+     * Finds and returns all private volatile fields inside the class
+     * We want to keep track of these because if they are saved in a register, then we can't invoke a foreign method
+     * because the other class can't access them
+     *
+     * @param classBody body of the class, whose fields we want to inspect
+     * @return an arraylist containing all names of the private volatile fields found, if any
      */
     private ArrayList<String> getPrivateVolatileFields(String classBody) {
         Pattern pattern = Pattern.compile("\\.field private volatile .*? (.*?):");
@@ -180,6 +207,16 @@ public class CallIndirection implements Transformation {
         return fields;
     }
 
+    /**
+     * Checks that the registers initialized for that method invocation do not contain any of the private volatile
+     * fields
+     * @param trimmedClassBody body of the class trimmed not to include further invocations that may include a new
+     *                         assignment of the registers
+     * @param methodRegisters registers passed as arguments in the invocation, that need to be checked
+     * @param fields list of private volatile fields of the current class
+     * @return true if at least one register contains the value of one of the private volatile fields at the moment of
+     * invocation, false otherwise
+     */
     private boolean checkRegisters(String trimmedClassBody, String methodRegisters, ArrayList<String> fields) {
         Pattern pattern = Pattern.compile("([pv][0-9]+)");
         Matcher matcher = pattern.matcher(methodRegisters);
