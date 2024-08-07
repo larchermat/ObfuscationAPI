@@ -59,16 +59,15 @@ public class CallIndirection implements Transformation {
                 // reference them in other classes
                 String source;
                 boolean isPublic;
-                if (matcher.find()) {
-                    currentClass = matcher.group(2);
-                    isPublic = matcher.group(1).contains("public");
-                    // If the class is not public we can't reference the methods we create from other classes, but because
-                    // some big classes are divided in multiple smali files, we can still invoke a method of a non-public
-                    // class if the current class has the same source
-                    source = matcher.group(3);
-                } else {
+                if (!matcher.find())
                     continue;
-                }
+                ArrayList<String> pVFields = getPrivateVolatileFields(fileCopy.toString());
+                currentClass = matcher.group(2);
+                isPublic = matcher.group(1).contains("public");
+                // If the class is not public we can't reference the methods we create from other classes, but because
+                // some big classes are divided in multiple smali files, we can still invoke a method of a non-public
+                // class if the current class has the same source
+                source = matcher.group(3);
 
                 // group(1) is the type of invocation: static for static methods or virtual
                 // group(2) contains the registers we're passing as parameters for the call
@@ -89,6 +88,8 @@ public class CallIndirection implements Transformation {
                     String invocation = methodClass + "->" + methodName + "(" + methodParameters + ")" + methodReturnType;
                     boolean newMethod = true;
                     String method;
+                    if (!pVFields.isEmpty() && checkRegisters(fileCopy.substring(0, matcher.start()), methodRegisters, pVFields))
+                        continue;
                     if (indirectMethods.containsKey(invocation) || indirectMethods.containsKey(source + invocation)) {
                         method = indirectMethods.get(invocation);
                         if (method == null)
@@ -163,4 +164,39 @@ public class CallIndirection implements Transformation {
         }
         return i;
     }
+
+    /**
+     * Finds and returns all
+     * @param classBody
+     * @return
+     */
+    private ArrayList<String> getPrivateVolatileFields(String classBody) {
+        Pattern pattern = Pattern.compile("\\.field private volatile .*? (.*?):");
+        Matcher matcher = pattern.matcher(classBody);
+        ArrayList<String> fields = new ArrayList<>();
+        while (matcher.find()) {
+            fields.add(matcher.group(1));
+        }
+        return fields;
+    }
+
+    private boolean checkRegisters(String trimmedClassBody, String methodRegisters, ArrayList<String> fields) {
+        Pattern pattern = Pattern.compile("([pv][0-9]+)");
+        Matcher matcher = pattern.matcher(methodRegisters);
+        ArrayList<String> registers = new ArrayList<>();
+        while (matcher.find()) {
+            registers.add(matcher.group(1));
+        }
+        for (String register : registers) {
+            pattern = Pattern.compile(register + ", \"(.*)\"");
+            matcher = pattern.matcher(trimmedClassBody);
+            String lastOccurrence = "";
+            while (matcher.find())
+                lastOccurrence = matcher.group(1);
+            if (fields.contains(lastOccurrence))
+                return true;
+        }
+        return false;
+    }
+
 }
