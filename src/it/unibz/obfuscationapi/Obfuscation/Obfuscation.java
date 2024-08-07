@@ -22,7 +22,6 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 public class Obfuscation {
     private final String path;
     private String pkg;
-    private final HashMap<String, ArrayList<File>> filesPerDir;
     private boolean isMultiDex;
     private final ArrayList<String> smaliDirs;
     private final ArrayList<String> dexDumps;
@@ -45,10 +44,6 @@ public class Obfuscation {
         smaliDirs.add(path + SEPARATOR + "smali");
         dexDumps = new ArrayList<>();
         setMultiDex();
-        filesPerDir = new HashMap<>();
-        for (String dir : smaliDirs) {
-            filesPerDir.put(dir, searchFiles(new File(dir), ".smali", null, null));
-        }
     }
 
     /**
@@ -59,6 +54,7 @@ public class Obfuscation {
      * @throws InterruptedException
      */
     private void decompileAPK(String pathToApk) throws IOException, InterruptedException {
+        // TODO: add the repo initialization to the bash and cmd scripts
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "decompileAPK.cmd", pathToApk};
@@ -74,6 +70,8 @@ public class Obfuscation {
             String[] cmd = {"bash", "decompileAPK.sh", pathToApk};
             if (execCommand(cmd, file) != 0)
                 throw new RuntimeException("Linux command \"" + String.join("", cmd) + "\" failed");
+        } else {
+            throw new RuntimeException("Unsupported OS: " + os);
         }
     }
 
@@ -89,11 +87,13 @@ public class Obfuscation {
             String[] cmd = {"cmd.exe", "/c", "rebuildAPK.cmd", appName};
             if (execCommand(cmd, file) != 0)
                 throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
-        } else {
+        } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             File file = new File(Paths.get("scripts", "unix").toString());
             String[] cmd = {"bash", "rebuildAPK.sh", appName};
             if (execCommand(cmd, file) != 0)
                 throw new RuntimeException("Unix command \"" + String.join(" ", cmd) + "\" failed");
+        } else {
+            throw new RuntimeException("Unsupported OS: " + os);
         }
     }
 
@@ -171,17 +171,48 @@ public class Obfuscation {
     }
 
     public void addCallIndirection(ArrayList<String> dirsToExclude) {
-        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        HashMap<String, Integer> dirsByLimit;
         try {
-            setLimit();
+            dirsByLimit = getSmaliDirsByMethodLimit();
         } catch (FileNotFoundException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            ArrayList<String> dirsOrder = new ArrayList<>(dirsByLimit.keySet());
+            int i = 0;
+            for (String dir : dirsOrder) {
+                i++;
+                System.out.println("[" + i + "] Number of methods that can be added to " + dir + ": " + dirsByLimit.get(dir));
+            }
+            System.out.println("Do you want to change these settings? [yes/no]");
+            String res = scanner.nextLine();
+            if (res.equalsIgnoreCase("no"))
+                break;
+            System.out.println("Which setting do you want to change? [1-" + i + "]");
+            int setting = scanner.nextInt();
+            scanner.nextLine();
+            while (setting < 1 || setting > i) {
+                System.out.println("Please enter a number between 1 and " + (i + 1) + ": ");
+                setting = scanner.nextInt();
+                scanner.nextLine();
+            }
+            int oldLimit = dirsByLimit.get(dirsOrder.get(setting - 1));
+            System.out.println("How many methods would you like to add? [0-" + oldLimit + "]");
+            int newLimit = scanner.nextInt();
+            scanner.nextLine();
+            while (newLimit < 0 || newLimit > oldLimit) {
+                System.out.println("Please enter a number between 0 and " + oldLimit + ": ");
+                newLimit = scanner.nextInt();
+                scanner.nextLine();
+            }
+            dirsByLimit.put(dirsOrder.get(setting - 1), newLimit);
+        }
         CallIndirection callIndirection;
         if (dirsToExclude != null)
-            callIndirection = new CallIndirection(pathToPackage.toString(), limit, dirsToExclude);
+            callIndirection = new CallIndirection(dirsByLimit, dirsToExclude);
         else
-            callIndirection = new CallIndirection(pathToPackage.toString(), limit);
+            callIndirection = new CallIndirection(dirsByLimit);
         transformations.forEach(transformation -> {
             if (transformation instanceof CallIndirection)
                 transformations.remove(transformation);
@@ -214,10 +245,6 @@ public class Obfuscation {
             pkg = (matcher.group(2) + matcher.group(3)).replace(".", "/");
     }
 
-    public void setLimit() throws FileNotFoundException, UnsupportedEncodingException {
-        limit = 65534 - getMethodNumber();
-    }
-
     /**
      * Determines if the project is multidex and adds the directories containing the smali files to
      * {@link Obfuscation#smaliDirs smaliDirs} and the dumps of the dex files to {@link Obfuscation#dexDumps dexDumps}
@@ -247,13 +274,13 @@ public class Obfuscation {
      * @throws FileNotFoundException
      * @throws UnsupportedEncodingException
      */
-    public HashMap<String, Integer> getMethodNumberPerDex() throws FileNotFoundException, UnsupportedEncodingException {
+    public HashMap<String, Integer> getSmaliDirsByMethodLimit() throws FileNotFoundException, UnsupportedEncodingException {
         return dexDumps.stream()
                 .collect(Collectors.toMap(
-                        dir -> dir,
+                        dir -> smaliDirs.get(dexDumps.indexOf(dir)),
                         dir -> {
                             try {
-                                return countMethodsInDex(dir);
+                                return 65534 - countMethodsInDex(dir);
                             } catch (FileNotFoundException | UnsupportedEncodingException e) {
                                 throw new RuntimeException(e);
                             }
@@ -261,17 +288,6 @@ public class Obfuscation {
                         (_, replacement) -> replacement,
                         HashMap::new
                 ));
-    }
-
-    /**
-     * Counts the number of methods for the default dex file classes.dex
-     *
-     * @return the number of methods declared in the classes.dex file
-     * @throws FileNotFoundException
-     * @throws UnsupportedEncodingException
-     */
-    public int getMethodNumber() throws FileNotFoundException, UnsupportedEncodingException {
-        return countMethodsInDex(dexDumps.getFirst());
     }
 
     /**
