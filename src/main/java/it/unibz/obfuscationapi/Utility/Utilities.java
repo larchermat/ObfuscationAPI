@@ -1,6 +1,7 @@
 package it.unibz.obfuscationapi.Utility;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -62,8 +63,17 @@ public class Utilities {
      * @throws UnsupportedEncodingException if the named charset is not supported
      */
     public static StringBuffer getStringBufferFromFile(String pathName) throws FileNotFoundException, UnsupportedEncodingException {
-        FileInputStream fis = new FileInputStream(pathName);
-        InputStreamReader f = new InputStreamReader(fis, CHAR_ENCODING);
+        InputStreamReader f;
+        FileInputStream fis = null;
+        InputStream is = null;
+        if (Files.exists(Paths.get(pathName))) {
+            fis = new FileInputStream(pathName);
+            f = new InputStreamReader(fis, CHAR_ENCODING);
+        } else {
+            is = Utilities.class.getResourceAsStream("/" + pathName);
+            assert is != null;
+            f = new InputStreamReader(is, CHAR_ENCODING);
+        }
 
         StringBuffer copy = new StringBuffer();
         Scanner scanner = new Scanner(f);
@@ -72,7 +82,15 @@ public class Utilities {
             copy.append(scanner.nextLine()).append(LS);
 
         scanner.close();
-
+        try {
+            f.close();
+            if (fis != null)
+                fis.close();
+            if (is != null)
+                is.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         return copy;
     }
 
@@ -102,7 +120,7 @@ public class Utilities {
      * which the files are searched needs to include at least one of the directories to include, and none of the ones to
      * exclude
      *
-     * @param dirPath      path of the parent directory in which the search is performed
+     * @param dirPath       path of the parent directory in which the search is performed
      * @param extension     extension of the files to find
      * @param dirsToInclude list of directories of which at least one needs to be included in the path
      * @param dirsToExclude list of directories of which none must be included in the path
@@ -141,8 +159,8 @@ public class Utilities {
      */
     public static boolean checkPath(ArrayList<String> toInclude, ArrayList<String> toExclude, String path) {
         path = path.replace(pathOfProject, "");
-        ArrayList<String> subDirs = (ArrayList<String>) Arrays.stream(path.split(SEPARATOR))
-                .toList();
+        ArrayList<String> subDirs = new ArrayList<>(Arrays.stream(path.split(SEPARATOR))
+                .toList());
         boolean containsOneToInclude = toInclude == null || toInclude.isEmpty() || toInclude.stream()
                 .anyMatch(subDirs::contains);
         boolean doesNotContainAnyToExclude = toExclude == null || toExclude.isEmpty() || toExclude.stream()

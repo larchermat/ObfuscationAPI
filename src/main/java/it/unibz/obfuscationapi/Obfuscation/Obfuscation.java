@@ -25,7 +25,6 @@ public class Obfuscation {
     private boolean isMultiDex;
     private final ArrayList<String> smaliDirs;
     private final ArrayList<String> dexDumps;
-    private int limit;
     private final ArrayList<Transformation> transformations;
     private final String os;
     private final String appName;
@@ -37,7 +36,7 @@ public class Obfuscation {
         String pathToApk = scanner.nextLine();
         appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1);
         os = System.getProperty("os.name").toLowerCase();
-        decompileAPK(pathToApk);
+        //decompileAPK(pathToApk);
         path = Paths.get("decompiled").toString();
         setPkg();
         smaliDirs = new ArrayList<>();

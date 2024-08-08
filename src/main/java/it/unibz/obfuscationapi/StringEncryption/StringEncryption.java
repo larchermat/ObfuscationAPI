@@ -19,7 +19,7 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 public class StringEncryption implements Transformation {
     private final ArrayList<String> dirsToExclude;
     private final String path;
-    private final String decryptionSrcFile = Paths.get("src", "it", "unibz", "obfuscationapi", "StringEncryption", "Decryption.txt").toString();
+    private final String decryptionSrcFile = Paths.get( "it", "unibz", "obfuscationapi", "StringEncryption", "Decryption.txt").toString();
 
     /**
      *

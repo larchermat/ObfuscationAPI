@@ -4,6 +4,7 @@ import it.unibz.obfuscationapi.Transformation.Transformation;
 import it.unibz.obfuscationapi.Utility.Utilities;
 
 import java.io.*;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -17,7 +18,7 @@ public class NopToJunk implements Transformation {
     final String COMPOUND_DELIM = "*";
     final ArrayList<String> dirsToExclude;
     final String path;
-    final String junkInstrFileName = "src/it/unibz/obfuscationapi/JunkInsertion/NopToJunk/junk_instr.txt";
+    final String junkInstrFileName = Paths.get("it", "unibz", "obfuscationapi", "JunkInsertion", "NopToJunk", "junk_instr.txt").toString();
     final String TO_SUBSTITUTE = "nop" + LS;
 
     private static ArrayList<ArrayList<String>> junkInstr;
@@ -45,8 +46,15 @@ public class NopToJunk implements Transformation {
 
     private ArrayList<ArrayList<String>> loadJunkInstr() throws FileNotFoundException {
         ArrayList<ArrayList<String>> als = new ArrayList<>();
-        File junkInstrFile = new File(junkInstrFileName);
-        Scanner scanner = new Scanner(junkInstrFile);
+        InputStream is = NopToJunk.class.getResourceAsStream("/" + junkInstrFileName);
+        InputStreamReader isr;
+        try {
+            assert is != null;
+            isr = new InputStreamReader(is, CHAR_ENCODING);
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+        Scanner scanner = new Scanner(isr);
         ArrayList<String> instr = new ArrayList<>();
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
@@ -60,7 +68,12 @@ public class NopToJunk implements Transformation {
             }
         }
         scanner.close();
-
+        try {
+            isr.close();
+            is.close();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         return als;
     }
 

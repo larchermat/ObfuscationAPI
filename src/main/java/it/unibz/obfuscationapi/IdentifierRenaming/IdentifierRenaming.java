@@ -282,8 +282,8 @@ public class IdentifierRenaming implements Transformation {
      * @param extension extension to look for
      */
     private void addFiles(File pathFile, String extension) {
-        ArrayList<String> dirsToInclude = new ArrayList<>(List.of(SEPARATOR + "smali" + SEPARATOR, SEPARATOR + "res" + SEPARATOR));
-        ArrayList<String> dirsToExclude = new ArrayList<>(List.of(SEPARATOR + "support" + SEPARATOR));
+        ArrayList<String> dirsToInclude = new ArrayList<>(List.of("smali", "res"));
+        ArrayList<String> dirsToExclude = new ArrayList<>(List.of("support"));
         searchFiles(pathFile, extension, fileList, dirsToInclude, dirsToExclude);
     }
 }
