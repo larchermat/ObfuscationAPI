@@ -1,5 +1,6 @@
 package it.unibz.obfuscationapi.Obfuscation;
 
+import it.unibz.obfuscationapi.ArithmeticBranching.ArithmeticBranching;
 import it.unibz.obfuscationapi.CallIndirection.CallIndirection;
 import it.unibz.obfuscationapi.CodeReorder.CodeReorder;
 import it.unibz.obfuscationapi.IdentifierRenaming.IdentifierRenaming;
@@ -217,6 +218,20 @@ public class Obfuscation {
                 transformations.remove(transformation);
         });
         transformations.add(callIndirection);
+    }
+
+    public void addArithmeticBranching(ArrayList<String> dirsToExclude) {
+        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        ArithmeticBranching arithmeticBranching;
+        if (dirsToExclude != null)
+            arithmeticBranching = new ArithmeticBranching(pathToPackage.toString(), dirsToExclude);
+        else
+            arithmeticBranching = new ArithmeticBranching(pathToPackage.toString());
+        transformations.forEach(transformation -> {
+            if (transformation instanceof ArithmeticBranching)
+                transformations.remove(transformation);
+        });
+        transformations.add(arithmeticBranching);
     }
 
     public void applyTransformations() {
