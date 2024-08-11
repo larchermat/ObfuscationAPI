@@ -1,5 +1,6 @@
 package it.unibz.obfuscationapi.Obfuscation;
 
+import it.unibz.obfuscationapi.AdvancedReflection.AdvancedReflection;
 import it.unibz.obfuscationapi.ArithmeticBranching.ArithmeticBranching;
 import it.unibz.obfuscationapi.CallIndirection.CallIndirection;
 import it.unibz.obfuscationapi.CodeReorder.CodeReorder;
@@ -232,6 +233,20 @@ public class Obfuscation {
                 transformations.remove(transformation);
         });
         transformations.add(arithmeticBranching);
+    }
+
+    public void addAdvancedApiReflection(ArrayList<String> dirsToExclude) {
+        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        AdvancedReflection advancedReflection;
+        if (dirsToExclude != null)
+            advancedReflection = new AdvancedReflection(pathToPackage.toString(), dirsToExclude);
+        else
+            advancedReflection = new AdvancedReflection(pathToPackage.toString());
+        transformations.forEach(transformation -> {
+            if (transformation instanceof AdvancedReflection)
+                transformations.remove(transformation);
+        });
+        transformations.add(advancedReflection);
     }
 
     public void applyTransformations() {
