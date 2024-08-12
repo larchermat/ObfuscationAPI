@@ -115,7 +115,7 @@ public class AdvancedReflection implements Transformation {
                 Pattern pattern1 = Pattern.compile("\\.locals ([0-9]+)");
                 Matcher matcher1 = pattern1.matcher(methodBody);
                 int locals = Integer.parseInt(matcher1.find() ? matcher1.group(1) : "16");
-                pattern1 = Pattern.compile("invoke-(virtual|static) \\{(.*)}, ((.*;)->(.*)\\((.*)\\)(V)?(.*)?)\\s+(move-result(?:.*)? ([vp0-9]+))?");
+                pattern1 = Pattern.compile("invoke-(virtual|static) \\{(.*)}, ((.*;)->(.*)\\((.*)\\)(V)?(.*)?)(\\s+move-result(?:.*)? ([vp0-9]+))?");
                 matcher1 = pattern1.matcher(methodBody);
                 while (matcher1.find()) {
                     String methodParameters = matcher1.group(6);
@@ -123,7 +123,9 @@ public class AdvancedReflection implements Transformation {
                     if ((locals + calculateRegisters(parameters)) > 11 || !dangerousApi.contains(matcher1.group(3)))
                         continue;
 
-                    String newMoveResult = matcher1.group(7) == null ? getNewMoveResult(matcher1) : "";
+                    String newMoveResult = "";
+                    if (matcher1.group(7) == null && matcher1.group(9) != null)
+                        newMoveResult = getNewMoveResult(matcher1);
                     String smaliCode = createReflectionMethod(methodNum, locals, matcher1.group(1).equals("virtual"), matcher1.group(2), parameters);
                     smaliCode += newMoveResult;
                     matcher1.appendReplacement(newMethodBody, smaliCode.replace("$", "\\$"));
@@ -232,9 +234,14 @@ public class AdvancedReflection implements Transformation {
             for (Map.Entry<String, String> entry : registersByParameter.entrySet()) {
                 String castPrimToClass = cast.get(entry.getKey());
                 if (castPrimToClass != null) {
-                    smaliCode.append(TAB + "invoke-static {").append(entry.getValue()).append("}, ").append(castPrimToClass).append(LS).append(LS).append(TAB).append("move-result-object #reg2#").append(LS).append(LS).append(TAB).append("const/4 #reg4#, ").append(String.format("0x%01X", index)).append(LS).append(LS).append(TAB).append("aput-object #reg2#, #reg1#, #reg4#").append(LS).append(LS);
+                    smaliCode.append(TAB + "invoke-static {").append(entry.getValue()).append("}, ")
+                            .append(castPrimToClass).append(LS).append(LS)
+                            .append(TAB).append("move-result-object #reg2#").append(LS).append(LS)
+                            .append(TAB).append("const/4 #reg4#, ").append(String.format("0x%01X", index)).append(LS).append(LS)
+                            .append(TAB).append("aput-object #reg2#, #reg1#, #reg4#").append(LS).append(LS);
                 } else {
-                    smaliCode.append(TAB + "const/4 #reg3#, ").append(String.format("0x%01X", index)).append(LS).append(LS).append(TAB).append("aput-object ").append(entry.getValue()).append(", #reg1#, #reg3#").append(LS).append(LS);
+                    smaliCode.append(TAB + "const/4 #reg3#, ").append(String.format("0x%01X", index)).append(LS).append(LS)
+                            .append(TAB).append("aput-object ").append(entry.getValue()).append(", #reg1#, #reg3#").append(LS).append(LS);
                 }
                 index++;
             }
@@ -242,9 +249,15 @@ public class AdvancedReflection implements Transformation {
         smaliCode.append(TAB + "const/16 #reg3#, ").append(String.format("0x%01X", methodNum)).append(LS).append(LS);
 
         if (virtual) {
-            smaliCode.append(TAB + "invoke-static {#reg3#, ").append(registers[0]).append(", #reg1#}, ").append("Lcom/apireflectionmanager/AdvancedApiReflection;->obfuscate(").append("ILjava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;").append(LS).append(LS);
+            smaliCode.append(TAB + "invoke-static {#reg3#, ")
+                    .append(registers[0]).append(", #reg1#}, ")
+                    .append("Lcom/apireflectionmanager/AdvancedApiReflection;->obfuscate(")
+                    .append("ILjava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
         } else {
-            smaliCode.append(TAB + "const/4 #reg4#, 0x0").append(LS).append(LS).append(TAB).append("invoke-static {#reg3#, #reg4#, #reg1#}, ").append("Lcom/apireflectionmanager/AdvancedApiReflection;->obfuscate(").append("ILjava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;").append(LS).append(LS);
+            smaliCode.append(TAB + "const/4 #reg4#, 0x0").append(LS).append(LS)
+                    .append(TAB).append("invoke-static {#reg3#, #reg4#, #reg1#}, ")
+                    .append("Lcom/apireflectionmanager/AdvancedApiReflection;->obfuscate(")
+                    .append("ILjava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;");
         }
         for (int i = 0; i < 4; i++) {
             smaliCode = new StringBuilder(smaliCode.toString().replace("#reg" + (i + 1) + "#", "v" + (locals + i)));
