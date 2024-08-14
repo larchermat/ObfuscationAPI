@@ -15,13 +15,13 @@ cp "$p" $basePath/apk.zip
 
 unzip $basePath/apk.zip -d $basePath/decomp
 
-dexFiles=`ls $basePath/decomp/ | grep classes`
+dexFiles=$(ls $basePath/decomp/ | grep classes)
 
 i=1
 
 for dexFile in $dexFiles
 do
-  $basePath/dexdump/mac/dexdump -d $basePath/decomp/"$dexFile" > $basePath/dump$i.txt
+  $basePath/binaries/mac/dexdump -d $basePath/decomp/"$dexFile" > $basePath/dump$i.txt
   i=$((i+1))
 done
 

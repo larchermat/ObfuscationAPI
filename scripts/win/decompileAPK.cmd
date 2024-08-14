@@ -26,7 +26,7 @@ for /f "delims=" %%f in ('dir /b %basePath%\decomp\*classes*') do (
 set i=1
 
 for %%f in (!dexFiles!) do (
-  "%basePath%\dexdump\win\dexdump" -d "%basePath%\decomp\%%f" > "%basePath%\dump!i!.txt"
+  "%basePath%\binaries\win\dexdump" -d "%basePath%\decomp\%%f" > "%basePath%\dump!i!.txt"
   set /a i+=1
 )
 
