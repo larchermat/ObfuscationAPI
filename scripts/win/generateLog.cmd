@@ -11,11 +11,6 @@ if "%2"=="" (
 )
 
 if "%3"=="" (
-  echo Missing activity event script
-  exit /b 1
-)
-
-if "%4"=="" (
   echo Missing path to local log.txt
   exit /b 1
 )
@@ -49,12 +44,14 @@ if "%pid%"=="" (
 
 %adb% shell /data/local/tmp/strace -p "%pid%" -o /data/local/tmp/strace_output.txt &
 
-%adb% shell "%3"
+if not "%4"=="" (
+  %adb% shell "%4"
+)
 
 timeout /T 5 > NUL
 
 %adb% shell am force-stop "%p%"
 
-%adb% pull /data/local/tmp/strace_output.txt "%4"
+%adb% pull /data/local/tmp/strace_output.txt "%3"
 
 %adb% emu kill

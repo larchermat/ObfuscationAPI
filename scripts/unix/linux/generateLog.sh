@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
-  echo "Usage: $0 <package> </.main_activity> <activity event script> <path to local log.txt>"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
+  echo "Usage: $0 <package> </.main_activity> <path to local log.txt>"
   exit 1
 fi
 
@@ -33,12 +33,14 @@ done
 
 $adb shell /data/local/tmp/strace -p "$pid" -o /data/local/tmp/strace_output.txt
 
-$adb shell "$3"
+if [ -n "$4" ]; then
+  $adb shell "$4"
+fi
 
 sleep 5
 
 $adb shell am force-stop "$p"
 
-$adb pull /data/local/tmp/strace_output.txt "$4"
+$adb pull /data/local/tmp/strace_output.txt "$3"
 
 $adb emu kill

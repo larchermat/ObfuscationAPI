@@ -4,6 +4,8 @@ import it.unibz.obfuscationapi.AdvancedReflection.AdvancedReflection;
 import it.unibz.obfuscationapi.ArithmeticBranching.ArithmeticBranching;
 import it.unibz.obfuscationapi.CallIndirection.CallIndirection;
 import it.unibz.obfuscationapi.CodeReorder.CodeReorder;
+import it.unibz.obfuscationapi.Events.EventCommandFactory;
+import it.unibz.obfuscationapi.Events.EventType;
 import it.unibz.obfuscationapi.IdentifierRenaming.IdentifierRenaming;
 import it.unibz.obfuscationapi.JunkInsertion.Insertion.Insertion;
 import it.unibz.obfuscationapi.JunkInsertion.NopToJunk.NopToJunk;
@@ -19,6 +21,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static it.unibz.obfuscationapi.Obfuscation.CommandExecution.*;
 import static it.unibz.obfuscationapi.Utility.Utilities.*;
 
 public class Obfuscation {
@@ -28,8 +31,9 @@ public class Obfuscation {
     private final ArrayList<String> smaliDirs;
     private final ArrayList<String> dexDumps;
     private final ArrayList<Transformation> transformations;
-    private final String os;
-    private final String appName;
+    public final String appName;
+    private final String avd;
+    private String mainActivity;
 
     public Obfuscation() throws IOException, InterruptedException {
         transformations = new ArrayList<>();
@@ -37,71 +41,16 @@ public class Obfuscation {
         Scanner scanner = new Scanner(System.in);
         String pathToApk = scanner.nextLine();
         appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1);
-        os = System.getProperty("os.name").toLowerCase();
-        //decompileAPK(pathToApk);
+        decompileAPK(pathToApk);
         path = Paths.get("decompiled").toString();
         setPkg();
         smaliDirs = new ArrayList<>();
         smaliDirs.add(path + SEPARATOR + "smali");
         dexDumps = new ArrayList<>();
         setMultiDex();
-    }
-
-    /**
-     * Executes the scripts in the scripts folder to decompile the APK and generate the dumps of the dex files
-     *
-     * @param pathToApk path to the original APK to decompile
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    private void decompileAPK(String pathToApk) throws IOException, InterruptedException {
-        // TODO: add the repo initialization to the bash and cmd scripts
-        if (os.contains("win")) {
-            File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "decompileAPK.cmd", pathToApk};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join("", cmd) + "\" failed");
-        } else if (os.contains("mac")) {
-            File file = new File(Paths.get("scripts", "unix", "mac").toString());
-            String[] cmd = {"bash", "decompileAPK.sh", pathToApk};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Mac command \"" + String.join("", cmd) + "\" failed");
-        } else if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-            File file = new File(Paths.get("scripts", "unix", "linux").toString());
-            String[] cmd = {"bash", "decompileAPK.sh", pathToApk};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Linux command \"" + String.join("", cmd) + "\" failed");
-        } else {
-            throw new RuntimeException("Unsupported OS: " + os);
-        }
-    }
-
-    /**
-     * Executes the scripts in the scripts folder to rebuild and sign the APK
-     *
-     * @throws IOException
-     * @throws InterruptedException
-     */
-    public void rebuildAPK() throws IOException, InterruptedException {
-        if (os.contains("win")) {
-            File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "rebuildAPK.cmd", appName};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
-        } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-            File file = new File(Paths.get("scripts", "unix").toString());
-            String[] cmd = {"bash", "rebuildAPK.sh", appName};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Unix command \"" + String.join(" ", cmd) + "\" failed");
-        } else {
-            throw new RuntimeException("Unsupported OS: " + os);
-        }
-    }
-
-    private int execCommand(String[] args, File file) throws IOException, InterruptedException {
-        Runtime rt = Runtime.getRuntime();
-        Process pr = rt.exec(args, null, file);
-        return pr.waitFor();
+        System.out.println("What is the AVD name? (name of the emulated device installed)");
+        avd = scanner.nextLine();
+        prepareDevice(avd);
     }
 
     public void addJunkCodeInsertion(ArrayList<String> dirsToExclude) {
@@ -260,6 +209,23 @@ public class Obfuscation {
         });
     }
 
+    /**
+     * Installs the APK on the emulated device and runs the application collecting the log of the execution after having
+     * sent an activity event
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public void runApk() throws IOException, InterruptedException {
+        installAPK(appName, avd, pkg.replace("/", "."), new ArrayList<>());
+        String AE = EventCommandFactory.getCommand(EventType.BATT_CHARGING).getCommand();
+        String pathToLog = "~/Desktop/UNIBZ/tesi/log.txt";
+        generateLog(pkg, mainActivity, pathToLog, AE);
+    }
+
+    /**
+     * Sets the package name and the entrypoint (main activity) of the application inspecting the AndroidManifest.xml
+     * file
+     */
     private void setPkg() {
         String pathToManifest = Paths.get(path, "AndroidManifest.xml").toString();
         StringBuffer sb;
@@ -272,6 +238,14 @@ public class Obfuscation {
         Matcher matcher = pattern.matcher(sb.toString());
         if (matcher.find())
             pkg = (matcher.group(2) + matcher.group(3)).replace(".", "/");
+        else
+            throw new RuntimeException("Could not find package in AndroidManifest.xml");
+        pattern = Pattern.compile("<activity.*?android:name=\"" + pkg.replace("/", ".") + "(.*?)\"");
+        matcher = pattern.matcher(sb.toString());
+        if (matcher.find())
+            mainActivity = "/" + matcher.group(1);
+        else
+            throw new RuntimeException("Could not find main activity in AndroidManifest.xml");
     }
 
     /**
@@ -375,11 +349,6 @@ public class Obfuscation {
         }
         return uniqueMethods.size();
     }
-    // 131072 is 16 and 817
-    // 262144 is 14 and 113
-    // 524288 is 9 and 639
-    // 1048576 is 7 and 12
-    // 2097152 is 5 and 649
 
 
     /**
