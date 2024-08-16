@@ -1,25 +1,26 @@
 @echo off
 
 if "%1"=="" (
-  echo Missing name of APK
-  exit /b 1
-)
-if "%2"=="" (
   echo Missing name of AVD
   exit /b 1
 )
 
-set a=%1
+set "emulator=%USERPROFILE%\AppData\Local\Android\Sdk\emulator\emulator.exe"
+
+if not exist "%emulator%" (
+  echo Android emulator could not be found under "%emulator%"
+  exit /b 1
+)
 
 set d=%2
 
-set "basePath=..\.."
+set "adb=..\..\binaries\win\adb"
 
-set "adb=%basePath%\binaries\win\adb"
+echo The device data will be wiped
 
 setlocal enabledelayedexpansion
 
-start "" /B "%USERPROFILE%\AppData\Local\Android\Sdk\emulator\emulator.exe" -avd %d% -no-snapshot-save > NUL 2>&1
+start "" /b "%emulator%" -avd %d% -wipe-data -no-snapshot-load > NUL 2>&1
 
 set tmr=0
 
@@ -42,7 +43,7 @@ set /a tmr+=5
 
 if %tmr% gtr 60 (
   echo Timeout, device took too long to boot
-  "%adb%" emu kill
+  %adb% emu kill
   exit /b 1
 )
 
@@ -50,16 +51,10 @@ goto :waitForDevice
 
 :deviceStarted
 
-"%adb%" root
+%adb% root
 
-"%adb%" install "%basePath%\decompiled\dist\%a%"
+cmd.exe /c installStrace.cmd
 
-if not "%3"=="" if not "%4"=="" (
-  set "permissions=%4"
-  set "p=%3"
-  for %%perm in (%permissions%) do (
-    "%adb%" shell pm grant "%p%" android.permission.%%perm
-  )
-)
+%adb% emu kill
 
 endlocal

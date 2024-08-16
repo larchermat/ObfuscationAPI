@@ -7,27 +7,33 @@ fi
 
 p="$1"
 
-m="$2"
+adb=../../../binaries/mac/adb
 
-s="$3"
+$adb shell am start -n "$p$2"
 
-basePath=../../..
-
-adb=$basePath/binaries/mac/adb
-
-$adb shell am start -n "$p$m"
+tmr=0
 
 while true; do
+  sleep 5
+
+  tmr=$((tmr + 5))
+
   pid=$($adb shell pidof "$p")
 
   if [ -n "$pid" ]; then
     break
   fi
+
+  if [ $tmr -gt 60 ]; then
+          echo "Timeout, app took too long to start"
+          $adb emu kill
+          exit 1
+      fi
 done
 
 $adb shell /data/local/tmp/strace -p "$pid" -o /data/local/tmp/strace_output.txt &
 
-$adb shell "$s"
+$adb shell "$3"
 
 sleep 5
 
