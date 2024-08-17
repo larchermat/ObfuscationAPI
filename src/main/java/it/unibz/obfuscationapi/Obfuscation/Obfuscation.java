@@ -31,6 +31,7 @@ public class Obfuscation {
     private final ArrayList<String> smaliDirs;
     private final ArrayList<String> dexDumps;
     private final ArrayList<Transformation> transformations;
+    private ArrayList<String> permissionsList;
     public final String appName;
     private final String avd;
     private String mainActivity;
@@ -212,19 +213,29 @@ public class Obfuscation {
     /**
      * Installs the APK on the emulated device and runs the application collecting the log of the execution after having
      * sent an activity event
+     *
      * @throws IOException
      * @throws InterruptedException
      */
     public void runApk() throws IOException, InterruptedException {
-        installAPK(appName, avd, pkg.replace("/", "."), new ArrayList<>());
-        String AE = EventCommandFactory.getCommand(EventType.BATT_CHARGING).getCommand();
-        String pathToLog = "~/Desktop/UNIBZ/tesi/log.txt";
-        generateLog(pkg, mainActivity, pathToLog, AE);
+        Path pathToLog = Paths.get("logs", pkg.replace("/", "."));
+        Files.createDirectories(pathToLog);
+
+        for (EventType eT : EventCommandFactory.commandMap.keySet()) {
+            String AE = EventCommandFactory.getCommand(eT).getCommand();
+            Path pathToLogs = pathToLog.resolve(eT.toString());
+            Files.createDirectory(pathToLogs);
+            for (int i = 0; i < 2; i++) {
+                installAPK(appName, avd, pkg.replace("/", "."), permissionsList);
+                String pathToLogFile = pathToLogs.resolve("log" + i + ".txt").toAbsolutePath().toString();
+                generateLog(pkg.replace("/", "."), mainActivity, pathToLogFile, AE);
+            }
+        }
     }
 
     /**
-     * Sets the package name and the entrypoint (main activity) of the application inspecting the AndroidManifest.xml
-     * file
+     * Sets the package name, the entrypoint (main activity) of the application and the required permissions (if any)
+     * inspecting the AndroidManifest.xml file
      */
     private void setPkg() {
         String pathToManifest = Paths.get(path, "AndroidManifest.xml").toString();
@@ -246,6 +257,13 @@ public class Obfuscation {
             mainActivity = "/" + matcher.group(1);
         else
             throw new RuntimeException("Could not find main activity in AndroidManifest.xml");
+
+        pattern = Pattern.compile("<uses-permission android:name=\"android\\.permission\\.(.*?)\"");
+        matcher = pattern.matcher(sb.toString());
+        permissionsList = new ArrayList<>();
+        while (matcher.find()) {
+            permissionsList.add(matcher.group(1));
+        }
     }
 
     /**

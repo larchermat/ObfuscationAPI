@@ -11,7 +11,7 @@ import it.unibz.obfuscationapi.Events.SYS.KeyEvent;
 import java.util.HashMap;
 
 public class EventCommandFactory {
-    private static final HashMap<EventType, EventCommand> commandMap = new HashMap<>();
+    public static final HashMap<EventType, EventCommand> commandMap = new HashMap<>();
 
     static {
         commandMap.put(EventType.BOOT_COMPLETED, new BootCompleted());

@@ -22,7 +22,7 @@ public class CommandExecution {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "decompileAPK.cmd", pathToApk};
             if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join("", cmd) + "\" failed");
+                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             Path path = Paths.get("scripts", "unix");
             if (os.contains("mac"))
@@ -32,7 +32,7 @@ public class CommandExecution {
             File file = new File(path.toString());
             String[] cmd = {"bash", "decompileAPK.sh", pathToApk};
             if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Mac command \"" + String.join("", cmd) + "\" failed");
+                throw new RuntimeException("Mac command \"" + String.join(" ", cmd) + "\" failed");
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
@@ -65,7 +65,7 @@ public class CommandExecution {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "prepareDevice.cmd", avd};
             if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join("", cmd) + "\" failed");
+                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             Path path = Paths.get("scripts", "unix");
             if (os.contains("mac"))
@@ -75,7 +75,7 @@ public class CommandExecution {
             File file = new File(path.toString());
             String[] cmd = {"bash", "prepareDevice.sh", avd};
             if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Mac command \"" + String.join("", cmd) + "\" failed");
+                throw new RuntimeException("Mac command \"" + String.join(" ", cmd) + "\" failed");
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
@@ -87,7 +87,7 @@ public class CommandExecution {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "installAPK.cmd", appName, avd, pkgName, permissions};
             if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join("", cmd) + "\" failed");
+                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             Path path = Paths.get("scripts", "unix");
             if (os.contains("mac"))
@@ -97,7 +97,7 @@ public class CommandExecution {
             File file = new File(path.toString());
             String[] cmd = {"bash", "installAPK.sh", appName, avd, pkgName, permissions};
             if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Mac command \"" + String.join("", cmd) + "\" failed");
+                throw new RuntimeException("Mac command \"" + String.join(" ", cmd) + "\" failed");
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
@@ -108,7 +108,7 @@ public class CommandExecution {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pkgName, mainActivity, aEScript, pathToLog};
             if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join("", cmd) + "\" failed");
+                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             Path path = Paths.get("scripts", "unix");
             if (os.contains("mac"))
@@ -118,7 +118,7 @@ public class CommandExecution {
             File file = new File(path.toString());
             String[] cmd = {"bash", "generateLog.sh", pkgName, mainActivity, pathToLog, aEScript};
             if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Mac command \"" + String.join("", cmd) + "\" failed");
+                throw new RuntimeException("Mac command \"" + String.join(" ", cmd) + "\" failed");
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
