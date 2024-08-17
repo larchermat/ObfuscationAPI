@@ -5,7 +5,6 @@ public enum EventType {
     BATT_FULL,
     BATT_HALF,
     BATT_LOW,
-    BATT_EMPTY,
     BATT_CHARGING,
     POWER_BUTTON,
     VOLUME_UP,

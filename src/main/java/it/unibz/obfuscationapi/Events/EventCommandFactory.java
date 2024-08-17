@@ -18,7 +18,6 @@ public class EventCommandFactory {
         commandMap.put(EventType.BATT_FULL, new BatteryLevel(EventType.BATT_FULL));
         commandMap.put(EventType.BATT_HALF, new BatteryLevel(EventType.BATT_HALF));
         commandMap.put(EventType.BATT_LOW, new BatteryLevel(EventType.BATT_LOW));
-        commandMap.put(EventType.BATT_EMPTY, new BatteryLevel(EventType.BATT_EMPTY));
         commandMap.put(EventType.BATT_CHARGING, new BatteryStatus());
         commandMap.put(EventType.POWER_BUTTON, new KeyEvent(EventType.POWER_BUTTON));
         commandMap.put(EventType.VOLUME_UP, new KeyEvent(EventType.VOLUME_UP));

@@ -11,7 +11,6 @@ public class BatteryLevel implements EventCommand {
             case BATT_FULL -> 100;
             case BATT_HALF -> 50;
             case BATT_LOW -> 19;
-            case BATT_EMPTY -> 0;
             default -> throw new IllegalStateException("Unexpected value: " + battLvl);
         };
     }
