@@ -17,7 +17,6 @@ public class CommandExecution {
      * @throws InterruptedException
      */
     public static void decompileAPK(String pathToApk) throws IOException, InterruptedException {
-        // TODO: add the repo initialization to the bash and cmd scripts
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "decompileAPK.cmd", pathToApk};
@@ -60,6 +59,35 @@ public class CommandExecution {
         }
     }
 
+    /**
+     * Cleans up the decompiled directory deleting the packages added because of the transformations and reverting
+     * changes using git
+     * @throws IOException
+     * @throws InterruptedException
+     */
+    public static void cleanUp() throws IOException, InterruptedException {
+        if (os.contains("win")) {
+            File file = new File(Paths.get("scripts", "win").toString());
+            String[] cmd = {"cmd.exe", "/c", "cleanUp.cmd"};
+            if (execCommand(cmd, file) != 0)
+                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
+        } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            File file = new File(Paths.get("scripts", "unix").toString());
+            String[] cmd = {"bash", "cleanUp.sh"};
+            if (execCommand(cmd, file) != 0)
+                throw new RuntimeException("Unix command \"" + String.join(" ", cmd) + "\" failed");
+        } else {
+            throw new RuntimeException("Unsupported OS: " + os);
+        }
+    }
+
+    /**
+     * Runs the script to wipe the device's data, start it once without loading any snapshot, install strace on it and
+     * exit saving the snapshot that will be reused for every execution
+     * @param avd the name of the emulated device (usually model_API, Pixel_6_API_33)
+     * @throws IOException
+     * @throws InterruptedException
+     */
     public static void prepareDevice(String avd) throws IOException, InterruptedException {
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
@@ -81,6 +109,16 @@ public class CommandExecution {
         }
     }
 
+    /**
+     * Starts the device loading the initial snapshot, installs the APK and grants (if any) the needed permissions to
+     * run the application
+     * @param appName name of the APK
+     * @param avd name of the emulated device
+     * @param pkgName name of the application package
+     * @param permissionsList list of permissions that the application needs (empty if there are no needed permissions)
+     * @throws IOException
+     * @throws InterruptedException
+     */
     public static void installAPK(String appName, String avd, String pkgName, ArrayList<String> permissionsList) throws IOException, InterruptedException {
         String permissions = permissionsList.isEmpty() ? "" : ("\"" + String.join(" ", permissionsList) + "\"");
         if (os.contains("win")) {
@@ -103,10 +141,21 @@ public class CommandExecution {
         }
     }
 
+    /**
+     * Needs to be executed when the device is turned on (after executing installAPK)
+     * Runs the script that starts the application attaching strace to it, records the execution after sending an event
+     * (if any), saves the log in the specified file and closes the emulator without saving
+     * @param pkgName name of the application package
+     * @param mainActivity entry point of the application
+     * @param pathToLog path where we want to store the log locally
+     * @param aEScript script that is executed by adb to trigger an event
+     * @throws IOException
+     * @throws InterruptedException
+     */
     public static void generateLog(String pkgName, String mainActivity, String pathToLog, String aEScript) throws IOException, InterruptedException {
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pkgName, mainActivity, aEScript, pathToLog};
+            String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pkgName, mainActivity, pathToLog, aEScript};
             if (execCommand(cmd, file) != 0)
                 throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
@@ -124,6 +173,14 @@ public class CommandExecution {
         }
     }
 
+    /**
+     * Executes a command and returns the exit code
+     * @param args array containing the instructions that compose the command
+     * @param file working directory in which the command is executed
+     * @return the exit code
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private static int execCommand(String[] args, File file) throws IOException, InterruptedException {
         Runtime rt = Runtime.getRuntime();
         Process pr = rt.exec(args, null, file);

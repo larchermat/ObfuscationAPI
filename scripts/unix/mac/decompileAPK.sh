@@ -28,3 +28,13 @@ done
 rm $basePath/apk.zip
 
 rm -r $basePath/decomp
+
+cd $basePath/decompiled || exit 1
+
+git init || exit 1
+
+git config core.safecrlf false
+
+git add -A
+
+git commit -q -m "Initial commit"

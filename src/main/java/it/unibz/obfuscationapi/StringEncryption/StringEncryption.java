@@ -32,6 +32,16 @@ public class StringEncryption implements Transformation {
     }
 
     /**
+     * @param path path to the package of the APK
+     */
+    public StringEncryption(String path) {
+        this.path = path;
+        this.dirsToExclude = new ArrayList<>();
+        dirsToExclude.add("android");
+        dirsToExclude.add("androidx");
+    }
+
+    /**
      * Applies the transformation string encryption to the decompiled APK
      */
     @Override
@@ -128,7 +138,7 @@ public class StringEncryption implements Transformation {
     }
 
     /**
-     * Encodes a string with a Caesar code with a specific shift
+     * Encodes a string using the Caesar cipher with a specific shift
      *
      * @param text text to encode
      * @param shift shift applied in the encryption

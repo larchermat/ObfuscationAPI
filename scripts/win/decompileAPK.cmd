@@ -34,4 +34,14 @@ del "%basePath%\apk.zip"
 
 rmdir /s /q "%basePath%\decomp"
 
+cd "%basePath%/decompiled"
+
+git init
+
+git config core.safecrlf false
+
+git add -A
+
+git commit -q -m "Initial commit"
+
 endlocal
