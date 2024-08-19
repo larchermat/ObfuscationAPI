@@ -1,5 +1,6 @@
 package it.unibz.obfuscationapi.AdvancedReflection;
 
+import it.unibz.obfuscationapi.Obfuscation.CommandExecution;
 import it.unibz.obfuscationapi.Transformation.Transformation;
 
 import java.io.*;
@@ -389,7 +390,11 @@ public class AdvancedReflection implements Transformation {
      * @return the string path to the file in the working directory
      */
     private String createApiReflectionClassFile() {
-        Pattern pattern = Pattern.compile(SEPARATOR + "smali");
+        String separator = SEPARATOR;
+        if (CommandExecution.os.contains("win")) {
+            separator += SEPARATOR;
+        }
+        Pattern pattern = Pattern.compile(separator + "smali");
         Matcher matcher = pattern.matcher(path);
         Path rflPath = null;
         try {

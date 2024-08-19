@@ -1,5 +1,6 @@
 package it.unibz.obfuscationapi.StringEncryption;
 
+import it.unibz.obfuscationapi.Obfuscation.CommandExecution;
 import it.unibz.obfuscationapi.Transformation.Transformation;
 import it.unibz.obfuscationapi.Utility.Utilities;
 
@@ -67,7 +68,11 @@ public class StringEncryption implements Transformation {
      * Decryption.smali file containing the code to apply the decryption to the strings
      */
     private void addDecryptionClass() {
-        Pattern pattern = Pattern.compile(SEPARATOR + "smali");
+        String separator = SEPARATOR;
+        if (CommandExecution.os.contains("win")) {
+            separator += SEPARATOR;
+        }
+        Pattern pattern = Pattern.compile(separator + "smali");
         Matcher matcher = pattern.matcher(path);
         try {
             if (matcher.find()) {

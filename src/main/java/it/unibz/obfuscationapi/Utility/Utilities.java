@@ -1,5 +1,7 @@
 package it.unibz.obfuscationapi.Utility;
 
+import it.unibz.obfuscationapi.Obfuscation.CommandExecution;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -159,7 +161,11 @@ public class Utilities {
      */
     public static boolean checkPath(ArrayList<String> toInclude, ArrayList<String> toExclude, String path) {
         path = path.replace(pathOfProject, "");
-        ArrayList<String> subDirs = new ArrayList<>(Arrays.stream(path.split(SEPARATOR))
+        String separator = SEPARATOR;
+        if (CommandExecution.os.contains("win")) {
+            separator += SEPARATOR;
+        }
+        ArrayList<String> subDirs = new ArrayList<>(Arrays.stream(path.split(separator))
                 .toList());
         boolean containsOneToInclude = toInclude == null || toInclude.isEmpty() || toInclude.stream()
                 .anyMatch(subDirs::contains);

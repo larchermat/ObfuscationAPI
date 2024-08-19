@@ -42,7 +42,7 @@ public class Obfuscation {
         Scanner scanner = new Scanner(System.in);
         String pathToApk = scanner.nextLine();
         appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1);
-        //decompileAPK(pathToApk);
+        decompileAPK(pathToApk);
         path = Paths.get("decompiled").toString();
         setPkg();
         smaliDirs = new ArrayList<>();
@@ -51,7 +51,7 @@ public class Obfuscation {
         setMultiDex();
         System.out.println("What is the AVD name? (name of the emulated device installed)");
         avd = scanner.nextLine();
-        //prepareDevice(avd);
+        prepareDevice(avd);
     }
 
     public void addJunkCodeInsertion(ArrayList<String> dirsToExclude) {
