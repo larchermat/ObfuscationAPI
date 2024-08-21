@@ -224,7 +224,7 @@ public class Obfuscation {
         for (EventType eT : EventCommandFactory.commandMap.keySet()) {
             String AE = EventCommandFactory.getCommand(eT).getCommand();
             Path pathToLogs = pathToLog.resolve(eT.toString());
-            Files.createDirectory(pathToLogs);
+            Files.createDirectories(pathToLogs);
             for (int i = 0; i < 2; i++) {
                 installAPK(appName, avd, pkg.replace("/", "."), permissionsList);
                 String pathToLogFile = pathToLogs.resolve("log" + i + ".txt").toAbsolutePath().toString();

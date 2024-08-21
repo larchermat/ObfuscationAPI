@@ -10,7 +10,7 @@ fi
 
 d="$1"
 
-adb=../../../binaries/mac/adb
+adb=~/Library/Android/sdk/platform-tools/adb
 
 if [ ! -e ~/Library/Android/sdk/emulator/emulator ]; then
   echo "No android emulator installed"
@@ -21,20 +21,17 @@ echo "The device's data will be wiped"
 
 nohup ~/Library/Android/sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load > /dev/null 2>&1 &
 
-pattern="^List of devices attached[[:space:]].*device$"
+pattern="^1"
 
 tmr=0
 
 while true; do
     sleep 5
 
-    result=$($adb devices)
+    result=$("$adb" shell getprop sys.boot_completed)
 
     if [[ "$result" =~ $pattern ]]; then
         echo "Successfully started emu"
-        $adb root
-        bash installStrace.sh
-        $adb emu kill
         break
     fi
 
@@ -42,7 +39,23 @@ while true; do
 
     if [ $tmr -gt 60 ]; then
         echo "Timeout, device took too long to boot"
-        $adb emu kill
+        "$adb" emu kill
         exit 1
     fi
+done
+
+"$adb" root
+
+bash installStrace.sh
+
+"$adb" emu kill
+
+pattern="^List of devices attached$"
+
+while true; do
+  result=$("$adb" devices)
+
+  if [[ "$result" =~ $pattern ]]; then
+    break
+  fi
 done

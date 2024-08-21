@@ -14,18 +14,18 @@ d="$2"
 
 basePath=../../..
 
-adb=$basePath/binaries/mac/adb
+adb=~/Library/Android/sdk/platform-tools/adb
 
 nohup ~/Library/Android/sdk/emulator/emulator @"$d" -no-snapshot-save > /dev/null 2>&1 &
 
-pattern="^List of devices attached[[:space:]].*device$"
+pattern="^1"
 
 tmr=0
 
 while true; do
     sleep 5
 
-    result=$($adb devices)
+    result=$("$adb" shell getprop sys.boot_completed)
 
     if [[ "$result" =~ $pattern ]]; then
         echo "Successfully started emu"
@@ -36,20 +36,20 @@ while true; do
 
     if [ $tmr -gt 60 ]; then
       echo "Timeout, device took too long to boot"
-      $adb emu kill
+      "$adb" emu kill
       exit 1
     fi
 
 done
 
-$adb root
+"$adb" root
 
-$adb install $basePath/decompiled/dist/"$a"
+"$adb" install $basePath/decompiled/dist/"$a"
 
 if [ -n "$3" ] && [ -n "$4" ]; then
   permissions="$4"
   p="$3"
   for perm in $permissions; do
-    $adb shell pm grant "$p" android.permission."$perm"
+    "$adb" shell pm grant "$p" android.permission."$perm"
   done
 fi

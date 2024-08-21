@@ -14,28 +14,28 @@ d="$2"
 
 basePath=../../..
 
-adb=$basePath/binaries/linux/adb
+adb=~/Android/Sdk/platform-tools/adb
 
 nohup ~/Android/sdk/emulator/emulator @"$d" -no-snapshot-save > /dev/null 2>&1 &
 
-timeout 60 $adb wait-for-device
+timeout 60 "$adb" wait-for-device
 
 if [ $? -ne 0 ]; then
   echo "Emulator failed to start within the timeout period."
-  $adb emu kill
+  "$adb" emu kill
   exit 1
 else
   echo "Emulator started successfully."
 fi
 
-$adb root
+"$adb" root
 
-$adb install $basePath/decompiled/dist/"$p"
+"$adb" install $basePath/decompiled/dist/"$p"
 
 if [ -n "$3" ] && [ -n "$4" ]; then
   permissions="$4"
   p="$3"
   for perm in $permissions; do
-    $adb shell pm grant "$p" android.permission."$perm"
+    "$adb" shell pm grant "$p" android.permission."$perm"
   done
 fi

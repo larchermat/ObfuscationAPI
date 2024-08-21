@@ -2,8 +2,18 @@
 
 basePath=../../..
 
-adb=$basePath/binaries/linux/adb
+pattern="arm"
 
-$adb push $basePath/binaries/android/strace /data/local/tmp/
+arch=$(uname -m)
 
-$adb shell chmod +x /data/local/tmp/strace
+strace=$basePath/binaries/android/x86/strace
+
+if [[ "$arch" =~ $pattern ]]; then
+  strace=$basePath/binaries/android/arm/strace
+fi
+
+adb=~/Android/Sdk/platform-tools/adb
+
+"$adb" push $strace /data/local/tmp/
+
+"$adb" shell chmod +x /data/local/tmp/strace

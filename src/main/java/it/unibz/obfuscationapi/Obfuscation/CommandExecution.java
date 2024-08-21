@@ -1,7 +1,6 @@
 package it.unibz.obfuscationapi.Obfuscation;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -62,6 +61,7 @@ public class CommandExecution {
     /**
      * Cleans up the decompiled directory deleting the packages added because of the transformations and reverting
      * changes using git
+     *
      * @throws IOException
      * @throws InterruptedException
      */
@@ -84,6 +84,7 @@ public class CommandExecution {
     /**
      * Runs the script to wipe the device's data, start it once without loading any snapshot, install strace on it and
      * exit saving the snapshot that will be reused for every execution
+     *
      * @param avd the name of the emulated device (usually model_API, Pixel_6_API_33)
      * @throws IOException
      * @throws InterruptedException
@@ -112,9 +113,10 @@ public class CommandExecution {
     /**
      * Starts the device loading the initial snapshot, installs the APK and grants (if any) the needed permissions to
      * run the application
-     * @param appName name of the APK
-     * @param avd name of the emulated device
-     * @param pkgName name of the application package
+     *
+     * @param appName         name of the APK
+     * @param avd             name of the emulated device
+     * @param pkgName         name of the application package
      * @param permissionsList list of permissions that the application needs (empty if there are no needed permissions)
      * @throws IOException
      * @throws InterruptedException
@@ -145,10 +147,11 @@ public class CommandExecution {
      * Needs to be executed when the device is turned on (after executing installAPK)
      * Runs the script that starts the application attaching strace to it, records the execution after sending an event
      * (if any), saves the log in the specified file and closes the emulator without saving
-     * @param pkgName name of the application package
+     *
+     * @param pkgName      name of the application package
      * @param mainActivity entry point of the application
-     * @param pathToLog path where we want to store the log locally
-     * @param aEScript script that is executed by adb to trigger an event
+     * @param pathToLog    path where we want to store the log locally
+     * @param aEScript     script that is executed by adb to trigger an event
      * @throws IOException
      * @throws InterruptedException
      */
@@ -175,6 +178,7 @@ public class CommandExecution {
 
     /**
      * Executes a command and returns the exit code
+     *
      * @param args array containing the instructions that compose the command
      * @param file working directory in which the command is executed
      * @return the exit code

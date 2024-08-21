@@ -10,29 +10,39 @@ fi
 
 d="$1"
 
-adb=../../../binaries/linux/adb
+adb=~/Android/Sdk/platform-tools/adb
 
-if [ ! -e ~/Android/sdk/emulator/emulator ]; then
+if [ ! -e ~/Android/Sdk/emulator/emulator ]; then
   echo "No android emulator installed"
   exit 1
 fi
 
 echo "The device's data will be wiped"
 
-nohup ~/Android/sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load > /dev/null 2>&1 &
+nohup ~/Android/Sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load > /dev/null 2>&1 &
 
-timeout 60 $adb wait-for-device
+timeout 60 "$adb" wait-for-device
 
 if [ $? -ne 0 ]; then
   echo "Emulator failed to start within the timeout period."
-  $adb emu kill
+  "$adb" emu kill
   exit 1
 else
   echo "Emulator started successfully."
 fi
 
-$adb root
+"$adb" root
 
 bash installStrace.sh
 
-$adb emu kill
+"$adb" emu kill
+
+pattern="^List of devices attached$"
+
+while true; do
+  result=$("$adb" devices)
+
+  if [[ "$result" =~ $pattern ]]; then
+    break
+  fi
+done

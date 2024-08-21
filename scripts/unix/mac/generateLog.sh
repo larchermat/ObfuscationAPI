@@ -7,9 +7,9 @@ fi
 
 p="$1"
 
-adb=../../../binaries/mac/adb
+adb=~/Library/Android/sdk/platform-tools/adb
 
-$adb shell am start -n "$p$2"
+"$adb" shell am start -n "$p$2"
 
 tmr=0
 
@@ -18,7 +18,7 @@ while true; do
 
   tmr=$((tmr + 5))
 
-  pid=$($adb shell pidof "$p")
+  pid=$("$adb" shell pidof "$p")
 
   if [ -n "$pid" ]; then
     break
@@ -26,21 +26,31 @@ while true; do
 
   if [ $tmr -gt 60 ]; then
           echo "Timeout, app took too long to start"
-          $adb emu kill
+          "$adb" emu kill
           exit 1
       fi
 done
 
-$adb shell /data/local/tmp/strace -p "$pid" -o /data/local/tmp/strace_output.txt &
+"$adb" shell /data/local/tmp/strace -p "$pid" -o /data/local/tmp/strace_output.txt &
 
 if [ -n "$4" ]; then
-  $adb shell "$4"
+  "$adb" shell "$4"
 fi
 
 sleep 5
 
-$adb shell am force-stop "$p"
+"$adb" shell am force-stop "$p"
 
-$adb pull /data/local/tmp/strace_output.txt "$3"
+"$adb" pull /data/local/tmp/strace_output.txt "$3"
 
-$adb emu kill
+"$adb" emu kill
+
+pattern="^List of devices attached$"
+
+while true; do
+  result=$("$adb" devices)
+
+  if [[ "$result" =~ $pattern ]]; then
+    break
+  fi
+done
