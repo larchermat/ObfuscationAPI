@@ -15,27 +15,21 @@ set d=%2
 
 set "basePath=..\.."
 
-set "adb=%basePath%\binaries\win\adb"
+set "adb=%USERPROFILE%\AppData\Local\Android\Sdk\platform-tools\adb"
 
-setlocal enabledelayedexpansion
-
-start "" /B "%USERPROFILE%\AppData\Local\Android\Sdk\emulator\emulator.exe" -avd %d% -no-snapshot-save > NUL 2>&1
+start "" /B "%USERPROFILE%\AppData\Local\Android\Sdk\emulator\emulator" -avd %d% -no-snapshot-save > NUL 2>&1
 
 set tmr=0
 
 :waitForDevice
-timeout /T 5 > NUL
+ping -n 5 127.0.0.1 > NUL
 
-set "output="
-
-for /f "tokens=*" %%i in ('%adb% devices') do (
-  set "output=!output!%%i "
-)
-
-echo !output!|findstr /r /c:"^List of devices attached.*device" > NUL 2>&1
-if not errorlevel 1 (
-    echo Successfully started emu
-    goto :deviceStarted
+for /f "tokens=*" %%i in ('"%adb%" shell getprop sys.boot_completed') do (
+  echo %%i|findstr /r /c:"^1" > NUL 2>&1
+  if not errorlevel 1 (
+      echo Successfully started emu
+      goto :deviceStarted
+  )
 )
 
 set /a tmr+=5
@@ -54,12 +48,8 @@ goto :waitForDevice
 
 "%adb%" install "%basePath%\decompiled\dist\%a%"
 
-if not "%3"=="" if not "%4"=="" (
-  set "permissions=%4"
-  set "p=%3"
-  for %%perm in (%permissions%) do (
-    "%adb%" shell pm grant "%p%" android.permission.%%perm
+if not "%3"=="" if not "%~4"=="" (
+  for %%p in (%~4) do (
+    "%adb%" shell pm grant "%3" android.permission.%%p
   )
 )
-
-endlocal

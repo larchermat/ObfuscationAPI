@@ -12,38 +12,32 @@ if not exist "%emulator%" (
   exit /b 1
 )
 
-set d=%2
+set d=%1
 
-set "adb=..\..\binaries\win\adb"
+set "adb=%USERPROFILE%\AppData\Local\Android\Sdk\platform-tools\adb"
 
 echo The device data will be wiped
-
-setlocal enabledelayedexpansion
 
 start "" /b "%emulator%" -avd %d% -wipe-data -no-snapshot-load > NUL 2>&1
 
 set tmr=0
 
 :waitForDevice
-timeout /T 5 > NUL
+ping -n 5 127.0.0.1 > NUL
 
-set "output="
-
-for /f "tokens=*" %%i in ('%adb% devices') do (
-  set "output=!output!%%i "
-)
-
-echo !output!|findstr /r /c:"^List of devices attached.*device" > NUL 2>&1
-if not errorlevel 1 (
-    echo Successfully started emu
-    goto :deviceStarted
+for /f "tokens=*" %%i in ('"%adb%" shell getprop sys.boot_completed') do (
+  echo %%i|findstr /r /c:"^1" > NUL 2>&1
+  if not errorlevel 1 (
+      echo Successfully started emu
+      goto :deviceStarted
+  )
 )
 
 set /a tmr+=5
 
-if %tmr% gtr 60 (
+if %tmr% gtr 120 (
   echo Timeout, device took too long to boot
-  %adb% emu kill
+  "%adb%" emu kill
   exit /b 1
 )
 
@@ -51,10 +45,8 @@ goto :waitForDevice
 
 :deviceStarted
 
-%adb% root
+"%adb%" root
 
-cmd.exe /c installStrace.cmd
+cmd.exe /c .\installStrace.cmd
 
-%adb% emu kill
-
-endlocal
+"%adb%" emu kill

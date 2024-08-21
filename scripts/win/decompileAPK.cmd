@@ -34,7 +34,12 @@ del "%basePath%\apk.zip"
 
 rmdir /s /q "%basePath%\decomp"
 
-cd "%basePath%/decompiled"
+cd "%basePath%\decompiled"
+
+(
+  echo dist
+  echo build
+) > .gitignore
 
 git init
 
