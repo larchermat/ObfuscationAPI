@@ -31,6 +31,8 @@ rm -r $basePath/decomp
 
 cd $basePath/decompiled || exit 1
 
+printf "dist\nbuild" > .gitignore
+
 git init || exit 1
 
 git config core.safecrlf false

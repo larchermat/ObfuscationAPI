@@ -108,12 +108,12 @@ public class Obfuscation {
     }
 
     public void addCodeReorder(ArrayList<String> dirsToExclude) {
-        Path pathToPackage = Paths.get(smaliDirs.getFirst(), pkg);
+        Path pathToSmali = Paths.get(smaliDirs.getFirst());
         CodeReorder codeReorder;
         if (dirsToExclude != null)
-            codeReorder = new CodeReorder(pathToPackage.toString(), dirsToExclude);
+            codeReorder = new CodeReorder(pathToSmali.toString(), dirsToExclude);
         else
-            codeReorder = new CodeReorder(pathToPackage.toString());
+            codeReorder = new CodeReorder(pathToSmali.toString());
         transformations.forEach(transformation -> {
             if (transformation instanceof CodeReorder)
                 transformations.remove(transformation);

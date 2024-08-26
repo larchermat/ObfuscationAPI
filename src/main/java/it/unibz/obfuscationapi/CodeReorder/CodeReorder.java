@@ -35,6 +35,8 @@ public class CodeReorder implements Transformation {
         this.path = path;
         this.dirsToExclude = dirsToExclude;
         dirsToExclude.add("data");
+        dirsToExclude.add("android");
+        dirsToExclude.add("androidx");
     }
 
     /**
