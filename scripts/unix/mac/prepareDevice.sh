@@ -3,10 +3,12 @@
 # This script starts the emulator wiping the device data and closes it to create a first snapshot that will be loaded
 # everytime we execute an APK
 
-if [ -z "$1" ]; then
-  echo "Usage: $0 <name of AVD>"
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Usage: $0 <name of AVD> <port>"
   exit 1
 fi
+
+export ANDROID_SERIAL="emulator-$2"
 
 d="$1"
 
@@ -19,14 +21,14 @@ fi
 
 echo "The device's data will be wiped"
 
-nohup ~/Library/Android/sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load > /dev/null 2>&1 &
+nohup ~/Library/Android/sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load -port "$2" -no-boot-anim > /dev/null 2>&1 &
 
 pattern="^1"
 
 tmr=0
 
 while true; do
-    sleep 5
+    sleep 1
 
     result=$("$adb" shell getprop sys.boot_completed)
 
@@ -35,11 +37,12 @@ while true; do
         break
     fi
 
-    tmr=$((tmr + 5))
+    tmr=$((tmr + 1))
 
     if [ $tmr -gt 60 ]; then
         echo "Timeout, device took too long to boot"
         "$adb" emu kill
+        sleep 5
         exit 1
     fi
 done
@@ -50,12 +53,4 @@ bash installStrace.sh
 
 "$adb" emu kill
 
-pattern="^List of devices attached$"
-
-while true; do
-  result=$("$adb" devices)
-
-  if [[ "$result" =~ $pattern ]]; then
-    break
-  fi
-done
+sleep 10

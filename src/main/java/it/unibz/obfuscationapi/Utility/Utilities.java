@@ -44,7 +44,10 @@ public class Utilities {
 
     private static ArrayList<String> navigateDirectoryContents(File dir, ArrayList<String> dirsToExclude, ArrayList<String> contents) throws IOException {
         File[] files = dir.listFiles();
-        assert files != null;
+        if (files == null) {
+            System.out.println("No files found in directory " + dir.getAbsolutePath());
+            return contents;
+        }
         for (File file : files) {
             if (file.isDirectory()) {
                 if (checkPath(null, dirsToExclude, file.getPath()))

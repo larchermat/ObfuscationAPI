@@ -1,14 +1,20 @@
 #!/bin/bash
 
 if [ -z "$1" ]; then
-  echo "Usage: $0 <name of APK>"
+  echo "Usage: $0 <name of APK> <obfuscation applied if any>"
   exit 1
 fi
 
-p="$1"
+p="$1.apk"
 
 basePath=../..
 
-java -jar $basePath/apktool/apktool.jar b $basePath/decompiled --use-aapt2 --debug
+if [ -z "$2" ]; then
+  java -jar $basePath/apktool/apktool.jar b $basePath/decompiled/"$1" --use-aapt2 --debug
+  java -jar $basePath/apksigner/uber-apk-signer-1.3.0.jar -a $basePath/decompiled/"$1"/dist/"$p" --allowResign --overwrite
+else
+  java -jar $basePath/apktool/apktool.jar b $basePath/decompiled/"$1" -o $basePath/decompiled/"$1/dist/$2/$p" --use-aapt2 --debug
+  java -jar $basePath/apksigner/uber-apk-signer-1.3.0.jar -a $basePath/decompiled/"$1/dist/$2/$p" --allowResign --overwrite
+fi
 
-java -jar $basePath/apksigner/uber-apk-signer-1.3.0.jar -a $basePath/decompiled/dist/"$p" --allowResign --overwrite
+bash cleanUp.sh "$1"

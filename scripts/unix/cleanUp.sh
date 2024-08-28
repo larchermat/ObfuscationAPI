@@ -1,6 +1,11 @@
 #!/bin/bash
 
-cd ../../decompiled || exit 1
+if [ -z "$1" ]; then
+  echo "Usage: $0 <directory>"
+  exit 1
+fi
+
+cd ../../decompiled/"$1" || exit 1
 
 if [ -e  smali/com/apireflectionmanager ]; then
   rm -r smali/com/apireflectionmanager

@@ -1,35 +1,39 @@
 #!/bin/bash
 
-if [ -z "$1" ]; then
-  echo "Usage: $0 <path to APK>"
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Usage: $0 <path to APK> <name of app>"
   exit 1
 fi
 
 p="$1"
 
+a="$2"
+
 basePath=../../..
 
-java -jar $basePath/apktool/apktool.jar d "$p" -o $basePath/decompiled
+rm -rf $basePath/decompiled/"$a"
 
-cp "$p" $basePath/apk.zip
+java -jar $basePath/apktool/apktool.jar d "$p" -o $basePath/decompiled/"$a"
 
-unzip $basePath/apk.zip -d $basePath/decomp
+cp "$p" $basePath/decompiled/"$a"/"$a".zip
 
-dexFiles=$(ls $basePath/decomp/ | grep classes)
+unzip $basePath/decompiled/"$a"/"$a".zip -d $basePath/decompiled/"$a"/decomp
+
+dexFiles=$(ls $basePath/decompiled/"$a"/decomp/ | grep classes)
 
 i=1
 
 for dexFile in $dexFiles
 do
-  $basePath/binaries/mac/dexdump -d $basePath/decomp/"$dexFile" > $basePath/dump$i.txt
+  $basePath/binaries/mac/dexdump -d $basePath/decompiled/"$a"/decomp/"$dexFile" > $basePath/decompiled/"$a"/dump$i.txt
   i=$((i+1))
 done
 
-rm $basePath/apk.zip
+rm $basePath/decompiled/"$a"/"$a".zip
 
-rm -r $basePath/decomp
+rm -r $basePath/decompiled/"$a"/decomp
 
-cd $basePath/decompiled || exit 1
+cd $basePath/decompiled/"$a" || exit 1
 
 printf "dist\nbuild" > .gitignore
 

@@ -198,7 +198,7 @@ public class CallIndirection implements Transformation {
      * @return an arraylist containing all names of the private volatile fields found, if any
      */
     private ArrayList<String> getPrivateVolatileFields(String classBody) {
-        Pattern pattern = Pattern.compile("\\.field private volatile .*? (.*?):");
+        Pattern pattern = Pattern.compile("\\.field (?:private )?(?:volatile)? .*? (.*?):");
         Matcher matcher = pattern.matcher(classBody);
         ArrayList<String> fields = new ArrayList<>();
         while (matcher.find()) {

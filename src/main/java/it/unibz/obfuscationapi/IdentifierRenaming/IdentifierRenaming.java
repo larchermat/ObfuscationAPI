@@ -24,6 +24,8 @@ public class IdentifierRenaming implements Transformation {
     private final String manifestPath;
     private StringBuffer manifestFile;
     private String operation;
+    public String modifiedPkgName;
+    public String newMainClassName;
 
     /**
      *
@@ -81,7 +83,7 @@ public class IdentifierRenaming implements Transformation {
 
         // Generating random name for package
         String newPkgName = generateRandomString(5, null);
-
+        modifiedPkgName = packageIdentifier.substring(0, packageIdentifier.lastIndexOf('/')) + "/" + newPkgName;
         if (operation.equals("renamePackage") || operation.equals("all")) {
             // Look for xml files in the res folder
             File fxml = new File(path + SEPARATOR + "res");
@@ -269,8 +271,8 @@ public class IdentifierRenaming implements Transformation {
                 matcher.appendReplacement(nFile, matcher.group(1) + classes.get(matcher.group(2) + "." + matcher.group(3)) + matcher.group(4));
             else if (classes.containsKey(packageIdentifier + "/" + matcher.group(3)))
                 matcher.appendReplacement(nFile, matcher.group(1) + classes.get(packageIdentifier + "/" + matcher.group(3)) + matcher.group(4));
+            newMainClassName = classes.get(packageIdentifier + "/" + matcher.group(3));
         }
-
         matcher.appendTail(nFile);
         manifestFile = nFile;
     }

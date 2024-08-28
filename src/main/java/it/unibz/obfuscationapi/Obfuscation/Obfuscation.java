@@ -17,12 +17,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static it.unibz.obfuscationapi.Obfuscation.CommandExecution.*;
 import static it.unibz.obfuscationapi.Utility.Utilities.*;
+import static java.lang.Thread.currentThread;
 
 public class Obfuscation {
     private final String path;
@@ -32,26 +36,97 @@ public class Obfuscation {
     private final ArrayList<String> dexDumps;
     private final ArrayList<Transformation> transformations;
     private ArrayList<String> permissionsList;
-    public final String appName;
-    private final String avd;
+    private final String appName;
     private String mainActivity;
+    public final ArrayList<String> avds = new ArrayList<>();
+    public final HashMap<String, Boolean> avdsByAvailability = new HashMap<>();
+    public final HashMap<Integer, Boolean> portsByAvailability = new HashMap<>();
+    public final HashMap<String, Integer> logsByNumber = new HashMap<>();
 
-    public Obfuscation() throws IOException, InterruptedException {
+    public Obfuscation(String pathToApk, int numAvds, String avdName) throws IOException, InterruptedException {
         transformations = new ArrayList<>();
-        System.out.println("Insert path to the APK (including the .apk file with extension)");
-        Scanner scanner = new Scanner(System.in);
-        String pathToApk = scanner.nextLine();
-        appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1);
-        decompileAPK(pathToApk);
-        path = Paths.get("decompiled").toString();
+        appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1).replace(".apk", "");
+        decompileAPK(pathToApk, appName);
+        path = Paths.get("decompiled", appName).toString();
         setPkg();
         smaliDirs = new ArrayList<>();
         smaliDirs.add(path + SEPARATOR + "smali");
         dexDumps = new ArrayList<>();
         setMultiDex();
-        System.out.println("What is the AVD name? (name of the emulated device installed)");
-        avd = scanner.nextLine();
-        prepareDevice(avd);
+        avds.add(avdName);
+        for (int i = 2; i <= numAvds; i++) {
+            avds.add(avdName + "_" + i);
+        }
+        int port = 5554;
+        synchronized (portsByAvailability) {
+            for (int i = 0; i < numAvds; i++) {
+                portsByAvailability.put(port, Boolean.TRUE);
+                port += 2;
+            }
+        }
+    }
+
+    public void startSampling() {
+        ExecutorService executorService = Executors.newFixedThreadPool(avds.size());
+        for (String avd : avds) {
+            executorService.submit(() -> initDevice(avd));
+        }
+        addCallIndirection(null);
+        addJunkCodeInsertion(null);
+        addArithmeticBranching(null);
+        addCodeReorder(null);
+        addIdentifierRenaming(null);
+        addAdvancedApiReflection(null);
+        addNopToJunk(null);
+        for (Transformation t : transformations) {
+            executorService.submit(() -> applyTransformation(t));
+        }
+        for (int i = 0; i < avds.size(); i++) {
+            for (Transformation t : transformations) {
+                Runner runner = new Runner(t);
+                executorService.submit(runner);
+            }
+        }
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+        }
+    }
+
+    private void initDevice(String avd) {
+        int port = findAvailablePort();
+        try {
+            prepareDevice(avd, port);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            synchronized (avdsByAvailability) {
+                avdsByAvailability.put(avd, Boolean.TRUE);
+            }
+            synchronized (portsByAvailability) {
+                portsByAvailability.put(port, Boolean.TRUE);
+            }
+        }
+    }
+
+    private int findAvailablePort() {
+        int port = 0;
+        while (port == 0) {
+            synchronized (portsByAvailability) {
+                for (Integer p : portsByAvailability.keySet()) {
+                    if (portsByAvailability.get(p)) {
+                        portsByAvailability.put(p, Boolean.FALSE);
+                        port = p;
+                        break;
+                    }
+                }
+            }
+        }
+        return port;
     }
 
     public void addJunkCodeInsertion(ArrayList<String> dirsToExclude) {
@@ -128,37 +203,6 @@ public class Obfuscation {
         } catch (FileNotFoundException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-        Scanner scanner = new Scanner(System.in);
-        while (true) {
-            ArrayList<String> dirsOrder = new ArrayList<>(dirsByLimit.keySet());
-            int i = 0;
-            for (String dir : dirsOrder) {
-                i++;
-                System.out.println("[" + i + "] Number of methods that can be added to " + dir + ": " + dirsByLimit.get(dir));
-            }
-            System.out.println("Do you want to change these settings? [yes/no]");
-            String res = scanner.nextLine();
-            if (res.equalsIgnoreCase("no"))
-                break;
-            System.out.println("Which setting do you want to change? [1-" + i + "]");
-            int setting = scanner.nextInt();
-            scanner.nextLine();
-            while (setting < 1 || setting > i) {
-                System.out.println("Please enter a number between 1 and " + (i + 1) + ": ");
-                setting = scanner.nextInt();
-                scanner.nextLine();
-            }
-            int oldLimit = dirsByLimit.get(dirsOrder.get(setting - 1));
-            System.out.println("How many methods would you like to add? [0-" + oldLimit + "]");
-            int newLimit = scanner.nextInt();
-            scanner.nextLine();
-            while (newLimit < 0 || newLimit > oldLimit) {
-                System.out.println("Please enter a number between 0 and " + oldLimit + ": ");
-                newLimit = scanner.nextInt();
-                scanner.nextLine();
-            }
-            dirsByLimit.put(dirsOrder.get(setting - 1), newLimit);
-        }
         CallIndirection callIndirection;
         if (dirsToExclude != null)
             callIndirection = new CallIndirection(dirsByLimit, dirsToExclude);
@@ -199,15 +243,23 @@ public class Obfuscation {
         transformations.add(advancedReflection);
     }
 
-    public void applyTransformations() {
-        transformations.forEach(transformation -> {
-            try {
-                transformation.obfuscate();
-                System.out.println(transformation.getClass().getSimpleName() + " transformation concluded successfully");
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
-        });
+    synchronized public void applyTransformation(Transformation transformation) {
+        try {
+            System.out.println(currentThread().getName() + " started " + transformation.getClass().getSimpleName() + " transformation");
+            transformation.obfuscate();
+            System.out.println(transformation.getClass().getSimpleName() + " transformation concluded successfully");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            buildAPK(transformation.getClass().getSimpleName());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    synchronized public void buildAPK(String transformation) throws IOException, InterruptedException {
+        rebuildAPK(appName, transformation);
     }
 
     /**
@@ -215,20 +267,57 @@ public class Obfuscation {
      * sent an activity event
      *
      * @throws IOException
-     * @throws InterruptedException
      */
-    public void runApk() throws IOException, InterruptedException {
-        Path pathToLog = Paths.get("logs", pkg.replace("/", "."));
-        Files.createDirectories(pathToLog);
-
-        for (EventType eT : EventCommandFactory.commandMap.keySet()) {
-            String AE = EventCommandFactory.getCommand(eT).getCommand();
-            Path pathToLogs = pathToLog.resolve(eT.toString());
-            Files.createDirectories(pathToLogs);
-            for (int i = 0; i < 2; i++) {
-                installAPK(appName, avd, pkg.replace("/", "."), permissionsList);
-                String pathToLogFile = pathToLogs.resolve("log" + i + ".txt").toAbsolutePath().toString();
-                generateLog(pkg.replace("/", "."), mainActivity, pathToLogFile, AE);
+    public void runApk(EventType eT, String transformation) throws IOException {
+        Path pathToLogs = Paths.get("logs", appName, transformation, eT.toString());
+        Files.createDirectories(pathToLogs);
+        String AE = EventCommandFactory.getCommand(eT).getCommand();
+        String avd = null;
+        while (avd == null) {
+            synchronized (avdsByAvailability) {
+                for (String device : avdsByAvailability.keySet()) {
+                    if (avdsByAvailability.get(device)) {
+                        avdsByAvailability.put(device, Boolean.FALSE);
+                        avd = device;
+                        break;
+                    }
+                }
+            }
+        }
+        int port = findAvailablePort();
+        int i = 1;
+        synchronized (logsByNumber) {
+            if (logsByNumber.containsKey(pathToLogs.toString()))
+                i = logsByNumber.get(pathToLogs.toString());
+            logsByNumber.put(pathToLogs.toString(), (i + 1));
+        }
+        String pkg;
+        String mainActivity;
+        if (transformation.equals("IdentifierRenaming")) {
+            IdentifierRenaming idRenaming = (IdentifierRenaming) transformations.stream()
+                    .filter(t -> t instanceof IdentifierRenaming).findFirst().get();
+            pkg = idRenaming.modifiedPkgName;
+            mainActivity = "/." + idRenaming.newMainClassName;
+            System.out.println("Pkg: " + pkg);
+            System.out.println("Main Activity: " + mainActivity);
+        } else {
+            pkg = this.pkg;
+            mainActivity = this.mainActivity;
+        }
+        String pathToApk = appName + SEPARATOR + "dist" + SEPARATOR + transformation + SEPARATOR + appName;
+        System.out.println(currentThread() + " is running device " + avd + " on port " + port);
+        try {
+            installAPK(pathToApk, avd, port, pkg.replace("/", "."), permissionsList);
+            String pathToLogFile = pathToLogs.resolve("log" + i + ".txt").toAbsolutePath().toString();
+            generateLog(pkg.replace("/", "."), mainActivity, pathToLogFile, port, AE);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            synchronized (avdsByAvailability) {
+                avdsByAvailability.put(avd, Boolean.TRUE);
+            }
+            synchronized (portsByAvailability) {
+                portsByAvailability.put(port, Boolean.TRUE);
             }
         }
     }
@@ -251,7 +340,7 @@ public class Obfuscation {
             pkg = (matcher.group(2) + matcher.group(3)).replace(".", "/");
         else
             throw new RuntimeException("Could not find package in AndroidManifest.xml");
-        pattern = Pattern.compile("<activity.*?android:name=\"" + pkg.replace("/", ".") + "(.*?)\"");
+        pattern = Pattern.compile("<activity.*?android:name=\"(?:" + pkg.replace("/", "\\.") + ")?(.*?)\"");
         matcher = pattern.matcher(sb.toString());
         if (matcher.find())
             mainActivity = "/" + matcher.group(1);
@@ -265,6 +354,7 @@ public class Obfuscation {
             permissionsList.add(matcher.group(1));
         }
     }
+
 
     /**
      * Determines if the project is multidex and adds the directories containing the smali files to
@@ -282,7 +372,7 @@ public class Obfuscation {
             if (Files.exists(dir))
                 smaliDirs.add(dir.toString());
         } while (Files.exists(dir));
-        Path dexDump = Paths.get("");
+        Path dexDump = Paths.get("decompiled", appName);
         for (i = 1; i <= smaliDirs.size(); i++) {
             dexDumps.add(dexDump.resolve("dump" + i + ".txt").toString());
         }
@@ -298,7 +388,7 @@ public class Obfuscation {
     public HashMap<String, Integer> getSmaliDirsByMethodLimit() throws FileNotFoundException, UnsupportedEncodingException {
         return dexDumps.stream()
                 .collect(Collectors.toMap(
-                        dir -> smaliDirs.get(dexDumps.indexOf(dir)),
+                        dir -> smaliDirs.get(dexDumps.indexOf(dir)) + SEPARATOR + pkg.replace("/", SEPARATOR),
                         dir -> {
                             try {
                                 return 65534 - countMethodsInDex(dir);
@@ -407,6 +497,28 @@ public class Obfuscation {
                     method = matcher1.group(6) + "->" + matcher1.group(7) + matcher1.group(8);
                 }
                 uniqueMethods.add(method);
+            }
+        }
+    }
+
+    private class Runner implements Runnable {
+        String transformation;
+
+        public Runner(Transformation transformation) {
+            this.transformation = transformation.getClass().getSimpleName();
+        }
+
+        @Override
+        public void run() {
+            for (EventType eventType : EventType.values()) {
+                for (int i = 0; i < 1; i++) {
+                    try {
+                        runApk(eventType, transformation);
+                    } catch (IOException | RuntimeException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                break;
             }
         }
     }
