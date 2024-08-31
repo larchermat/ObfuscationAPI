@@ -21,6 +21,7 @@ public class Utilities {
     public final static String SEPARATOR = File.separator;
     private final static Random RANDOM = new Random();
     private final static String pathOfProject = Paths.get("").toAbsolutePath().toString();
+    private static int errorLogCount = 0;
 
     public static int randInt(int max) {
         return randInt(0, max);
@@ -207,5 +208,20 @@ public class Utilities {
             Path fullPath = basePath.resolve(dirPath).normalize();
             return fullPath.toString();
         }
+    }
+
+    synchronized public static void writeErrorLog(StringBuilder args) throws IOException {
+        Path path = Paths.get("errors", "error" + errorLogCount + ".txt");
+        errorLogCount++;
+        File errorLog = new File(path.toString());
+        if (errorLog.exists()) {
+            Files.delete(path);
+        }
+        Files.createFile(path);
+        FileOutputStream fos = new FileOutputStream(errorLog);
+        OutputStreamWriter osw = new OutputStreamWriter(fos, CHAR_ENCODING);
+        osw.append(args.toString());
+        osw.close();
+        fos.close();
     }
 }

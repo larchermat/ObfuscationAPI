@@ -104,7 +104,7 @@ public class ArithmeticBranching implements Transformation {
                         matcher1.group(3) + LS +
                         TAB + ":" + endLabel + LS + LS +
                         TAB + "goto/32 :" + startLabel + LS;
-                matcher.appendReplacement(nFile, (matcher.group(1) + temp + matcher.group(3)).replace("$", "\\$"));
+                matcher.appendReplacement(nFile, Matcher.quoteReplacement(matcher.group(1) + temp + matcher.group(3)));
             }
             matcher.appendTail(nFile);
             File f = new File(file);

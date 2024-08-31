@@ -34,7 +34,7 @@ while true; do
       fi
 done
 
-"$adb" shell /data/local/tmp/strace -p "$pid" -o /data/local/tmp/strace_output.txt &
+"$adb" shell strace -r -T -x -p "$pid" -o /data/local/tmp/strace_output.txt &
 
 if [ -n "$5" ]; then
   "$adb" shell "$5"

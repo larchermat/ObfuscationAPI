@@ -47,6 +47,4 @@ goto :waitForDevice
 
 "%adb%" root
 
-cmd.exe /c .\installStrace.cmd
-
 "%adb%" emu kill

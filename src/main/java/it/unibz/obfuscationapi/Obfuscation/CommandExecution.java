@@ -3,7 +3,13 @@ package it.unibz.obfuscationapi.Obfuscation;
 import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.Date;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static it.unibz.obfuscationapi.Utility.Utilities.LS;
+import static it.unibz.obfuscationapi.Utility.Utilities.writeErrorLog;
+import static java.lang.Thread.currentThread;
 
 public class CommandExecution {
     public static final String os = System.getProperty("os.name").toLowerCase();
@@ -16,11 +22,16 @@ public class CommandExecution {
      * @throws InterruptedException
      */
     public static void decompileAPK(String pathToApk, String appName) throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "decompileAPK.cmd", pathToApk, appName};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             Path path = Paths.get("scripts", "unix");
             if (os.contains("mac"))
@@ -29,11 +40,14 @@ public class CommandExecution {
                 path = path.resolve("linux");
             File file = new File(path.toString());
             String[] cmd = {"bash", "decompileAPK.sh", pathToApk, appName};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException(os + " command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
+        reportError(errorLog, retCode, command, "decompileAPK");
     }
 
     /**
@@ -43,19 +57,27 @@ public class CommandExecution {
      * @throws InterruptedException
      */
     public static void rebuildAPK(String appName, String obfuscation) throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "rebuildAPK.cmd", appName, obfuscation};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             File file = new File(Paths.get("scripts", "unix").toString());
             String[] cmd = {"bash", "rebuildAPK.sh", appName, obfuscation};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException(os + " command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
+        reportError(errorLog, retCode, command, "rebuildAPK");
     }
 
     /**
@@ -66,35 +88,48 @@ public class CommandExecution {
      * @throws InterruptedException
      */
     public static void cleanUp() throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "cleanUp.cmd"};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             File file = new File(Paths.get("scripts", "unix").toString());
             String[] cmd = {"bash", "cleanUp.sh"};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException(os + " command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
+        reportError(errorLog, retCode, command, "cleanUp");
     }
 
     /**
-     * Runs the script to wipe the device's data, start it once without loading any snapshot, install strace on it and
-     * exit saving the snapshot that will be reused for every execution
+     * Runs the script to wipe the device's data, start it once without loading any snapshot, and exit, saving the
+     * snapshot that will be reused for every execution
      *
      * @param avd the name of the emulated device (usually model_API, Pixel_6_API_33)
      * @throws IOException
      * @throws InterruptedException
      */
     public static void prepareDevice(String avd, int port) throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "prepareDevice.cmd", avd};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             Path path = Paths.get("scripts", "unix");
             if (os.contains("mac"))
@@ -103,11 +138,14 @@ public class CommandExecution {
                 path = path.resolve("linux");
             File file = new File(path.toString());
             String[] cmd = {"bash", "prepareDevice.sh", avd, String.valueOf(port)};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException(os + " command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
+        reportError(errorLog, retCode, command, "prepareDevice");
     }
 
     /**
@@ -117,18 +155,20 @@ public class CommandExecution {
      * @param appName         name of the APK
      * @param avd             name of the emulated device
      * @param port            port of the emulated device
-     * @param pkgName         name of the application package
-     * @param permissionsList list of permissions that the application needs (empty if there are no needed permissions)
      * @throws IOException
      * @throws InterruptedException
      */
-    public static void installAPK(String appName, String avd, int port, String pkgName, ArrayList<String> permissionsList) throws IOException, InterruptedException {
-        String permissions = permissionsList.isEmpty() ? "" : ("\"" + String.join(" ", permissionsList) + "\"");
+    public static void installAPK(String appName, String avd, int port) throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "installAPK.cmd", appName, avd, pkgName, permissions};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
+            String[] cmd = {"cmd.exe", "/c", "installAPK.cmd", appName, avd};
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             Path path = Paths.get("scripts", "unix");
             if (os.contains("mac"))
@@ -136,12 +176,15 @@ public class CommandExecution {
             else
                 path = path.resolve("linux");
             File file = new File(path.toString());
-            String[] cmd = {"bash", "installAPK.sh", appName, avd, String.valueOf(port), pkgName, permissions};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException(os + " command \"" + String.join(" ", cmd) + "\" failed");
+            String[] cmd = {"bash", "installAPK.sh", appName, avd, String.valueOf(port)};
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
+        reportError(errorLog, retCode, command, "installAPK");
     }
 
     /**
@@ -158,11 +201,16 @@ public class CommandExecution {
      * @throws InterruptedException
      */
     public static void generateLog(String pkgName, String mainActivity, String pathToLog, int port, String aEScript) throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pkgName, mainActivity, pathToLog, aEScript};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException("Windows command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             Path path = Paths.get("scripts", "unix");
             if (os.contains("mac"))
@@ -171,10 +219,28 @@ public class CommandExecution {
                 path = path.resolve("linux");
             File file = new File(path.toString());
             String[] cmd = {"bash", "generateLog.sh", pkgName, mainActivity, pathToLog, String.valueOf(port), aEScript};
-            if (execCommand(cmd, file) != 0)
-                throw new RuntimeException(os + " command \"" + String.join(" ", cmd) + "\" failed");
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
+        }
+        reportError(errorLog, retCode, command, "generateLog");
+    }
+
+    private static void reportError(String errorLog, int retCode, String command, String methodName) throws IOException {
+        if (!errorLog.isBlank()) {
+            StringBuilder args = new StringBuilder();
+            args.append("Thread: ").append(currentThread()).append(LS)
+                    .append("Time: ").append(new Date(System.currentTimeMillis())).append(LS)
+                    .append("Method: ").append(methodName).append(LS)
+                    .append("Command: ").append(command).append(LS)
+                    .append("Error: ").append(LS).append(errorLog).append(LS);
+            writeErrorLog(args);
+        }
+        if (retCode != 0) {
+            throw new RuntimeException(os + " command \"" + command + "\" failed");
         }
     }
 
@@ -187,7 +253,7 @@ public class CommandExecution {
      * @throws IOException
      * @throws InterruptedException
      */
-    private static int execCommand(String[] args, File file) throws IOException, InterruptedException {
+    private static String[] execCommand(String[] args, File file) throws IOException, InterruptedException {
         Runtime rt = Runtime.getRuntime();
         Process pr = rt.exec(args, null, file);
 
@@ -195,11 +261,23 @@ public class CommandExecution {
                 InputStreamReader(pr.getErrorStream()));
 
         String s;
-
-        System.out.println("Here is the standard error of the command (if any):\n");
+        StringBuilder sb = new StringBuilder();
+        String log = "";
         while ((s = stdError.readLine()) != null) {
-            System.out.println(s);
+            sb.append(s).append(LS);
         }
-        return pr.waitFor();
+        if (!sb.isEmpty()) {
+            String reg = "(adb: device offline)|" +
+                    "(adb: device .*? not found)|" +
+                    "(.*?strace_output\\.txt: 1 file pulled, 0 skipped.*?\\))|" +
+                    "(.*?strace: 1 file pushed, 0 skipped.*?\\))|" +
+                    "(All files should be loaded\\. Notifying the device\\.)|" +
+                    "(strace: Process [0-9]+ attached)|" +
+                    "(^$)";
+            Pattern pattern = Pattern.compile(reg);
+            Matcher matcher = pattern.matcher(sb);
+            log = matcher.replaceAll("").trim();
+        }
+        return new String[]{String.valueOf(pr.waitFor()), log};
     }
 }

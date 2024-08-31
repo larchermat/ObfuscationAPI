@@ -205,10 +205,14 @@ public class IdentifierRenaming implements Transformation {
         StringBuffer nFile = new StringBuffer();
 
         while (matcher.find()) {
-            if ((matcher.group(1) + matcher.group(2)).contains(packageIdentifier) && (matcher.group(5) != null && (matcher.group(5) + matcher.group(6)).contains(packageIdentifier)))
-                matcher.appendReplacement(nFile, matcher.group(1) + newPkgName + matcher.group(3).replace("$", "\\$") + (matcher.group(5).replace("$", "\\$") + newPkgName + matcher.group(7)));
-            else if ((matcher.group(1) + matcher.group(2)).contains(packageIdentifier))
-                matcher.appendReplacement(nFile, matcher.group(1) + newPkgName + matcher.group(3).replace("$", "\\$") + (matcher.group(5) != null ? matcher.group(5).replace("$", "\\$") + matcher.group(6) + matcher.group(7) : ""));
+            if ((matcher.group(1) + matcher.group(2)).contains(packageIdentifier) && (matcher.group(5) != null && (matcher.group(5) + matcher.group(6)).contains(packageIdentifier))) {
+                String replacement = matcher.group(1) + newPkgName + matcher.group(3) + matcher.group(5) + newPkgName + matcher.group(7);
+                matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
+            }
+            else if ((matcher.group(1) + matcher.group(2)).contains(packageIdentifier)) {
+                String replacement = matcher.group(1) + newPkgName + matcher.group(3) + (matcher.group(5) != null ? matcher.group(5) + matcher.group(6) + matcher.group(7) : "");
+                matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
+            }
         }
 
         matcher.appendTail(nFile);
@@ -245,11 +249,12 @@ public class IdentifierRenaming implements Transformation {
                 String target = matcher.group(1) + (matcher.group(2) != null ? matcher.group(2) : "") + matcher.group(4);
                 if (classes.containsKey(target)) {
                     String replacement = matcher.group(1) + (matcher.group(2) == null ? matcher.group(2) : "") + classes.get(target);
-                    matcher.appendReplacement(nFile, replacement.replace("$", "\\$"));
+                    matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
                 }
             } else if (matcher.group(5) != null && classes.containsKey(pathFile)) {
                 // Second case, we have .source "ClassName
-                matcher.appendReplacement(nFile, matcher.group(5).replace("$", "\\$") + classes.get(pathFile).replace("$", "\\$"));
+                String replacement = matcher.group(5) + classes.get(pathFile);
+                matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
             }
         }
         matcher.appendTail(nFile);

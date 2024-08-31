@@ -37,10 +37,10 @@ cd $basePath/decompiled/"$a" || exit 1
 
 printf "dist\nbuild" > .gitignore
 
-git init || exit 1
+git init > /dev/null 2>&1 || exit 1
 
-git config core.safecrlf false
+git config core.safecrlf false > /dev/null 2>&1
 
-git add -A
+git add -A > /dev/null 2>&1
 
-git commit -q -m "Initial commit"
+git commit -q -m "Initial commit" > /dev/null 2>&1

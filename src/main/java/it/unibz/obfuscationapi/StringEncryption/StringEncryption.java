@@ -131,7 +131,7 @@ public class StringEncryption implements Transformation {
                     "}, Lcom/123456789/Decrypter;->applyCaesar(Ljava/lang/String;)Ljava/lang/String;" + LS +
                     "    move-result-object " + matcher.group(3);
             String replacement = matcher.group(1) + matcher.group(3) + matcher.group(4) + key + LS + insert;
-            matcher.appendReplacement(nFile, replacement.replace("$", "\\$"));
+            matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
             times++;
         }
         matcher.appendTail(nFile);

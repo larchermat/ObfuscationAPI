@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# One can optionally pass the permissions to grant as a single string separated by spaces "perm1 perm2" plus the name of
-# the package
-
 if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
   echo "Usage: $0 <path to APK> <name of AVD> <port>"
   exit 1
@@ -47,12 +44,4 @@ done
 
 "$adb" root
 
-"$adb" install $basePath/decompiled/"$a"
-
-if [ -n "$4" ] && [ -n "$5" ]; then
-  permissions="$5"
-  p="$4"
-  for perm in $permissions; do
-    "$adb" shell pm grant "$p" android.permission."$perm"
-  done
-fi
+"$adb" install -g $basePath/decompiled/"$a"

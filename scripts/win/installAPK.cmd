@@ -46,10 +46,4 @@ goto :waitForDevice
 
 "%adb%" root
 
-"%adb%" install "%basePath%\decompiled\dist\%a%"
-
-if not "%3"=="" if not "%~4"=="" (
-  for %%p in (%~4) do (
-    "%adb%" shell pm grant "%3" android.permission.%%p
-  )
-)
+"%adb%" install -g "%basePath%\decompiled\dist\%a%"

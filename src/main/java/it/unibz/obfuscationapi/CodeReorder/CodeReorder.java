@@ -24,6 +24,7 @@ public class CodeReorder implements Transformation {
         this.path = path;
         this.dirsToExclude = new ArrayList<>();
         dirsToExclude.add("android");
+        dirsToExclude.add("androidx");
         dirsToExclude.add("data");
     }
 
@@ -34,9 +35,9 @@ public class CodeReorder implements Transformation {
     public CodeReorder(String path, ArrayList<String> dirsToExclude) {
         this.path = path;
         this.dirsToExclude = dirsToExclude;
-        dirsToExclude.add("data");
         dirsToExclude.add("android");
         dirsToExclude.add("androidx");
+        dirsToExclude.add("data");
     }
 
     /**
@@ -73,7 +74,7 @@ public class CodeReorder implements Transformation {
 
             String newMethod = reorderMethod(method);
             String replacement = directive + matcher.group(2) + newMethod + matcher.group(4);
-            matcher.appendReplacement(nFile, replacement.replace("$", "\\$"));
+            matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(nFile);
         FileOutputStream fos = new FileOutputStream(filePath);

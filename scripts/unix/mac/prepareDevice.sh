@@ -49,8 +49,6 @@ done
 
 "$adb" root
 
-bash installStrace.sh
-
 "$adb" emu kill
 
 sleep 10

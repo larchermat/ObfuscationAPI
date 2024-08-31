@@ -121,7 +121,7 @@ public class CallIndirection implements Transformation {
                     }
                     String replacement = "invoke-static " + methodRegisters + ", " + method;
 
-                    matcher.appendReplacement(newFile, replacement.replace("$", "\\$"));
+                    matcher.appendReplacement(newFile, Matcher.quoteReplacement(replacement));
 
                     if (!newMethod)
                         continue;

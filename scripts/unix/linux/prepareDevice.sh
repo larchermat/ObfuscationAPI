@@ -33,8 +33,6 @@ fi
 
 "$adb" root
 
-bash installStrace.sh
-
 "$adb" emu kill
 
 pattern="^List of devices attached$"

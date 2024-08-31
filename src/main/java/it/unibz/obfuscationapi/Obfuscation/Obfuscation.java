@@ -35,7 +35,7 @@ public class Obfuscation {
     private final ArrayList<String> smaliDirs;
     private final ArrayList<String> dexDumps;
     private final ArrayList<Transformation> transformations;
-    private ArrayList<String> permissionsList;
+    //private ArrayList<String> permissionsList;
     private final String appName;
     private String mainActivity;
     public final ArrayList<String> avds = new ArrayList<>();
@@ -183,7 +183,7 @@ public class Obfuscation {
     }
 
     public void addCodeReorder(ArrayList<String> dirsToExclude) {
-        Path pathToSmali = Paths.get(smaliDirs.getFirst());
+        Path pathToSmali = Paths.get(smaliDirs.getFirst(), pkg);
         CodeReorder codeReorder;
         if (dirsToExclude != null)
             codeReorder = new CodeReorder(pathToSmali.toString(), dirsToExclude);
@@ -272,6 +272,15 @@ public class Obfuscation {
         Path pathToLogs = Paths.get("logs", appName, transformation, eT.toString());
         Files.createDirectories(pathToLogs);
         String AE = EventCommandFactory.getCommand(eT).getCommand();
+        int i = 1;
+        synchronized (logsByNumber) {
+            if (logsByNumber.containsKey(pathToLogs.toString()))
+                i = logsByNumber.get(pathToLogs.toString());
+            if (i > 1)
+                return;
+            logsByNumber.put(pathToLogs.toString(), (i + 1));
+        }
+
         String avd = null;
         while (avd == null) {
             synchronized (avdsByAvailability) {
@@ -285,12 +294,6 @@ public class Obfuscation {
             }
         }
         int port = findAvailablePort();
-        int i = 1;
-        synchronized (logsByNumber) {
-            if (logsByNumber.containsKey(pathToLogs.toString()))
-                i = logsByNumber.get(pathToLogs.toString());
-            logsByNumber.put(pathToLogs.toString(), (i + 1));
-        }
         String pkg;
         String mainActivity;
         if (transformation.equals("IdentifierRenaming")) {
@@ -298,8 +301,6 @@ public class Obfuscation {
                     .filter(t -> t instanceof IdentifierRenaming).findFirst().get();
             pkg = idRenaming.modifiedPkgName;
             mainActivity = "/." + idRenaming.newMainClassName;
-            System.out.println("Pkg: " + pkg);
-            System.out.println("Main Activity: " + mainActivity);
         } else {
             pkg = this.pkg;
             mainActivity = this.mainActivity;
@@ -307,7 +308,7 @@ public class Obfuscation {
         String pathToApk = appName + SEPARATOR + "dist" + SEPARATOR + transformation + SEPARATOR + appName;
         System.out.println(currentThread() + " is running device " + avd + " on port " + port);
         try {
-            installAPK(pathToApk, avd, port, pkg.replace("/", "."), permissionsList);
+            installAPK(pathToApk, avd, port/*, pkg.replace("/", "."), permissionsList*/);
             String pathToLogFile = pathToLogs.resolve("log" + i + ".txt").toAbsolutePath().toString();
             generateLog(pkg.replace("/", "."), mainActivity, pathToLogFile, port, AE);
         } catch (InterruptedException e) {
@@ -342,17 +343,18 @@ public class Obfuscation {
             throw new RuntimeException("Could not find package in AndroidManifest.xml");
         pattern = Pattern.compile("<activity.*?android:name=\"(?:" + pkg.replace("/", "\\.") + ")?(.*?)\"");
         matcher = pattern.matcher(sb.toString());
-        if (matcher.find())
-            mainActivity = "/" + matcher.group(1);
+        if (matcher.find()) {
+            mainActivity = "/" + (matcher.group(1).startsWith(".") ? matcher.group(1) : "." + matcher.group(1));
+        }
         else
             throw new RuntimeException("Could not find main activity in AndroidManifest.xml");
 
-        pattern = Pattern.compile("<uses-permission android:name=\"android\\.permission\\.(.*?)\"");
-        matcher = pattern.matcher(sb.toString());
-        permissionsList = new ArrayList<>();
-        while (matcher.find()) {
-            permissionsList.add(matcher.group(1));
-        }
+//        pattern = Pattern.compile("<uses-permission android:name=\"android\\.permission\\.(.*?)\"");
+//        matcher = pattern.matcher(sb.toString());
+//        permissionsList = new ArrayList<>();
+//        while (matcher.find()) {
+//            permissionsList.add(matcher.group(1));
+//        }
     }
 
 
@@ -518,7 +520,6 @@ public class Obfuscation {
                         throw new RuntimeException(e);
                     }
                 }
-                break;
             }
         }
     }

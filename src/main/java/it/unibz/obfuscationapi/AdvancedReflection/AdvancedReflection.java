@@ -129,7 +129,7 @@ public class AdvancedReflection implements Transformation {
                         newMoveResult = getNewMoveResult(matcher1);
                     String smaliCode = createReflectionMethod(methodNum, locals, matcher1.group(1).equals("virtual"), matcher1.group(2), parameters);
                     smaliCode += newMoveResult;
-                    matcher1.appendReplacement(newMethodBody, smaliCode.replace("$", "\\$"));
+                    matcher1.appendReplacement(newMethodBody, Matcher.quoteReplacement(smaliCode));
                     locals += 4;
                     methodNum++;
                     smaliReflectionClassCode.append(addReflectionCode(matcher1.group(4), matcher1.group(5), parameters));
@@ -142,7 +142,7 @@ public class AdvancedReflection implements Transformation {
                     temp = matcher1.replaceFirst(matcher1.group(1) + locals);
                 }
                 String replacement = matcher.group(1) + temp + matcher.group(3);
-                matcher.appendReplacement(newFile, replacement.replace("$", "\\$"));
+                matcher.appendReplacement(newFile, Matcher.quoteReplacement(replacement));
             }
             matcher.appendTail(newFile);
 
