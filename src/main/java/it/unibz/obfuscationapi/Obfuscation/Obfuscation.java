@@ -19,6 +19,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,14 +29,20 @@ import static it.unibz.obfuscationapi.Obfuscation.CommandExecution.*;
 import static it.unibz.obfuscationapi.Utility.Utilities.*;
 import static java.lang.Thread.currentThread;
 
+/**
+ * This class contains the methods to decompile and obfuscate an APK <br>
+ * Additionally, for the purpose of studying the behavior of the APKs, the class also contains the methods to execute
+ * the following automated pipeline: decompile the APK, run all selected transformations recompiling each different
+ * version of the APK, run each version of the APK on a set of selected android emulated devices, triggering each time
+ * an event and collecting the log of the execution in the logs folder
+ */
 public class Obfuscation {
+    private final int logsPerCase;
     private final String path;
     private String pkg;
-    private boolean isMultiDex;
     private final ArrayList<String> smaliDirs;
     private final ArrayList<String> dexDumps;
     private final ArrayList<Transformation> transformations;
-    //private ArrayList<String> permissionsList;
     private final String appName;
     private String mainActivity;
     public final ArrayList<String> avds = new ArrayList<>();
@@ -43,7 +50,8 @@ public class Obfuscation {
     public final HashMap<Integer, Boolean> portsByAvailability = new HashMap<>();
     public final HashMap<String, Integer> logsByNumber = new HashMap<>();
 
-    public Obfuscation(String pathToApk, int numAvds, String avdName) throws IOException, InterruptedException {
+    public Obfuscation(String pathToApk, int numAvds, String avdName, int logsPerCase) throws IOException, InterruptedException {
+        this.logsPerCase = logsPerCase;
         transformations = new ArrayList<>();
         appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1).replace(".apk", "");
         decompileAPK(pathToApk, appName);
@@ -66,26 +74,28 @@ public class Obfuscation {
         }
     }
 
+    /**
+     * Runs the complete pipeline for the generation of the log.txt files <br>
+     * An {@link ExecutorService ExecutorService} is used, initializing a fixed thread pool of n threads, with n being
+     * the number of devices available <br>
+     * It then initializes all devices, applies all selected transformations, and submits n
+     * {@link Obfuscation#executeRuns() executeRuns()} tasks
+     */
     public void startSampling() {
         ExecutorService executorService = Executors.newFixedThreadPool(avds.size());
         for (String avd : avds) {
             executorService.submit(() -> initDevice(avd));
         }
-        addCallIndirection(null);
-        addJunkCodeInsertion(null);
-        addArithmeticBranching(null);
-        addCodeReorder(null);
-        addIdentifierRenaming(null);
-        addAdvancedApiReflection(null);
-        addNopToJunk(null);
+        Future<?> task = null;
         for (Transformation t : transformations) {
-            executorService.submit(() -> applyTransformation(t));
+            task = executorService.submit(() -> applyTransformation(t));
         }
+        do {
+            assert task != null;
+        } while (!task.isDone());
+
         for (int i = 0; i < avds.size(); i++) {
-            for (Transformation t : transformations) {
-                Runner runner = new Runner(t);
-                executorService.submit(runner);
-            }
+            executorService.submit(this::executeRuns);
         }
         executorService.shutdown();
         try {
@@ -97,6 +107,10 @@ public class Obfuscation {
         }
     }
 
+    /**
+     * Initializes a device with the given name
+     * @param avd name of the device to initialize
+     */
     private void initDevice(String avd) {
         int port = findAvailablePort();
         try {
@@ -113,6 +127,10 @@ public class Obfuscation {
         }
     }
 
+    /**
+     * Returns the first available port dedicated to the execution of the emulated devices
+     * @return the available port
+     */
     private int findAvailablePort() {
         int port = 0;
         while (port == 0) {
@@ -127,6 +145,17 @@ public class Obfuscation {
             }
         }
         return port;
+    }
+
+    public void addAllTransformations() {
+        addCallIndirection(null);
+        addJunkCodeInsertion(null);
+        addArithmeticBranching(null);
+        addCodeReorder(null);
+        addIdentifierRenaming(null);
+        addAdvancedApiReflection(null);
+        addNopToJunk(null);
+        addStringEncryption(null);
     }
 
     public void addJunkCodeInsertion(ArrayList<String> dirsToExclude) {
@@ -243,6 +272,10 @@ public class Obfuscation {
         transformations.add(advancedReflection);
     }
 
+    /**
+     * Applies a chosen transformation to the decompiled APK and rebuilds it
+     * @param transformation transformation to be applied
+     */
     synchronized public void applyTransformation(Transformation transformation) {
         try {
             System.out.println(currentThread().getName() + " started " + transformation.getClass().getSimpleName() + " transformation");
@@ -265,35 +298,8 @@ public class Obfuscation {
     /**
      * Installs the APK on the emulated device and runs the application collecting the log of the execution after having
      * sent an activity event
-     *
-     * @throws IOException
      */
-    public void runApk(EventType eT, String transformation) throws IOException {
-        Path pathToLogs = Paths.get("logs", appName, transformation, eT.toString());
-        Files.createDirectories(pathToLogs);
-        String AE = EventCommandFactory.getCommand(eT).getCommand();
-        int i = 1;
-        synchronized (logsByNumber) {
-            if (logsByNumber.containsKey(pathToLogs.toString()))
-                i = logsByNumber.get(pathToLogs.toString());
-            if (i > 1)
-                return;
-            logsByNumber.put(pathToLogs.toString(), (i + 1));
-        }
-
-        String avd = null;
-        while (avd == null) {
-            synchronized (avdsByAvailability) {
-                for (String device : avdsByAvailability.keySet()) {
-                    if (avdsByAvailability.get(device)) {
-                        avdsByAvailability.put(device, Boolean.FALSE);
-                        avd = device;
-                        break;
-                    }
-                }
-            }
-        }
-        int port = findAvailablePort();
+    public void runApk(String AE, String transformation, int logNumber, Path pathToLogs, String avd, int port) throws IOException, InterruptedException {
         String pkg;
         String mainActivity;
         if (transformation.equals("IdentifierRenaming")) {
@@ -306,21 +312,44 @@ public class Obfuscation {
             mainActivity = this.mainActivity;
         }
         String pathToApk = appName + SEPARATOR + "dist" + SEPARATOR + transformation + SEPARATOR + appName;
-        System.out.println(currentThread() + " is running device " + avd + " on port " + port);
-        try {
-            installAPK(pathToApk, avd, port/*, pkg.replace("/", "."), permissionsList*/);
-            String pathToLogFile = pathToLogs.resolve("log" + i + ".txt").toAbsolutePath().toString();
-            generateLog(pkg.replace("/", "."), mainActivity, pathToLogFile, port, AE);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } finally {
+        installAPK(pathToApk, avd, port);
+        String pathToLogFile = pathToLogs.resolve("log" + logNumber + ".txt").toAbsolutePath().toString();
+        generateLog(pkg.replace("/", "."), mainActivity, pathToLogFile, port, AE);
+    }
+
+    /**
+     * Method returns the number of the log to be generated for a given log folder, incrementing the entry in the
+     * logsByNumber hashMap for the given pathToLogs
+     * If this number exceeds the logsPerCase value, then it returns null
+     * @param pathToLogs path to the folder containing the logs
+     * @return the number of the next log to be generated, null if the number exceeds the limit of logs per case
+     */
+    private Integer getLogNumber(Path pathToLogs) {
+        int i = 1;
+        synchronized (logsByNumber) {
+            if (logsByNumber.containsKey(pathToLogs.toString()))
+                i = logsByNumber.get(pathToLogs.toString());
+            if (i > logsPerCase)
+                return null;
+            logsByNumber.put(pathToLogs.toString(), (i + 1));
+        }
+        return i;
+    }
+
+    private String findAvailableDevice() {
+        String avd = null;
+        while (avd == null) {
             synchronized (avdsByAvailability) {
-                avdsByAvailability.put(avd, Boolean.TRUE);
-            }
-            synchronized (portsByAvailability) {
-                portsByAvailability.put(port, Boolean.TRUE);
+                for (String device : avdsByAvailability.keySet()) {
+                    if (avdsByAvailability.get(device)) {
+                        avdsByAvailability.put(device, Boolean.FALSE);
+                        avd = device;
+                        break;
+                    }
+                }
             }
         }
+        return avd;
     }
 
     /**
@@ -345,16 +374,8 @@ public class Obfuscation {
         matcher = pattern.matcher(sb.toString());
         if (matcher.find()) {
             mainActivity = "/" + (matcher.group(1).startsWith(".") ? matcher.group(1) : "." + matcher.group(1));
-        }
-        else
+        } else
             throw new RuntimeException("Could not find main activity in AndroidManifest.xml");
-
-//        pattern = Pattern.compile("<uses-permission android:name=\"android\\.permission\\.(.*?)\"");
-//        matcher = pattern.matcher(sb.toString());
-//        permissionsList = new ArrayList<>();
-//        while (matcher.find()) {
-//            permissionsList.add(matcher.group(1));
-//        }
     }
 
 
@@ -363,7 +384,7 @@ public class Obfuscation {
      * {@link Obfuscation#smaliDirs smaliDirs} and the dumps of the dex files to {@link Obfuscation#dexDumps dexDumps}
      */
     private void setMultiDex() {
-        isMultiDex = false;
+        boolean isMultiDex = false;
         Path base = Paths.get(path);
         int i = 2;
         Path dir;
@@ -384,8 +405,6 @@ public class Obfuscation {
      * If the APK is multiDex this method counts the number of methods for every dex file
      *
      * @return HashMap containing the pairs path of dexdump and the number of methods in the files inside of it
-     * @throws FileNotFoundException
-     * @throws UnsupportedEncodingException
      */
     public HashMap<String, Integer> getSmaliDirsByMethodLimit() throws FileNotFoundException, UnsupportedEncodingException {
         return dexDumps.stream()
@@ -412,9 +431,7 @@ public class Obfuscation {
      * around the same size, so we're occupying in total around 4MB of memory with the objects in this method
      *
      * @param dexDump string containing the path to the dex file
-     * @return
-     * @throws FileNotFoundException
-     * @throws UnsupportedEncodingException
+     * @return the number of unique methods contained in a dex file
      */
     public int countMethodsInDex(String dexDump) throws FileNotFoundException, UnsupportedEncodingException {
         HashSet<String> uniqueMethods = new HashSet<>();
@@ -465,8 +482,6 @@ public class Obfuscation {
      * Updates the HashSet provided adding all unique methods found in a chunk of the dex file
      *
      * @param dexChunk StringBuilder containing the chunk of the dex file to analyze
-     * @throws FileNotFoundException
-     * @throws UnsupportedEncodingException
      */
     public void countMethodsInDexChunk(StringBuilder dexChunk, HashSet<String> uniqueMethods) throws FileNotFoundException, UnsupportedEncodingException {
         Pattern pattern = Pattern.compile("(Class #[0-9]+)(?s)(.*?)(source_file_idx.*?\\))");
@@ -503,25 +518,47 @@ public class Obfuscation {
         }
     }
 
-    private class Runner implements Runnable {
-        String transformation;
-
-        public Runner(Transformation transformation) {
-            this.transformation = transformation.getClass().getSimpleName();
-        }
-
-        @Override
-        public void run() {
+    /**
+     * Method that generates logs for all selected transformations combined with all events
+     */
+    private void executeRuns() {
+        for (Transformation t : transformations) {
+            String transformation = t.getClass().getSimpleName();
             for (EventType eventType : EventType.values()) {
-                for (int i = 0; i < 1; i++) {
+                int exceptionCount = 0;
+                Path pathToLogs = Paths.get("logs", appName, transformation, eventType.toString());
+                if (!Files.exists(pathToLogs)) {
                     try {
-                        runApk(eventType, transformation);
-                    } catch (IOException | RuntimeException e) {
+                        Files.createDirectories(pathToLogs);
+                    } catch (IOException e) {
                         throw new RuntimeException(e);
+                    }
+                }
+                while (true) {
+                    Integer i = getLogNumber(pathToLogs);
+                    if (i == null)
+                        break;
+                    String avd = findAvailableDevice();
+                    int port = findAvailablePort();
+                    try {
+                        runApk(EventCommandFactory.getCommand(eventType).getCommand(), transformation, i, pathToLogs, avd, port);
+                    } catch (IOException | InterruptedException e) {
+                        e.printStackTrace();
+                        exceptionCount++;
+                        if (exceptionCount >= 10) {
+                            System.out.println("Execution of " + transformation + " " + eventType + ", continues stopping");
+                            break;
+                        }
+                    } finally {
+                        synchronized (avdsByAvailability) {
+                            avdsByAvailability.put(avd, Boolean.TRUE);
+                        }
+                        synchronized (portsByAvailability) {
+                            portsByAvailability.put(port, Boolean.TRUE);
+                        }
                     }
                 }
             }
         }
     }
-
 }

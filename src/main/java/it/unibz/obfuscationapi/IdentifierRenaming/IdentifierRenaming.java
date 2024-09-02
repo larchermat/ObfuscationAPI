@@ -272,11 +272,14 @@ public class IdentifierRenaming implements Transformation {
         StringBuffer nFile = new StringBuffer();
         Matcher matcher = pattern.matcher(manifestFile.toString());
         while (matcher.find()) {
-            if (matcher.group(2) != null && classes.containsKey(matcher.group(2) + "." + matcher.group(3)))
+            if (matcher.group(2) != null && classes.containsKey(matcher.group(2) + "." + matcher.group(3))) {
                 matcher.appendReplacement(nFile, matcher.group(1) + classes.get(matcher.group(2) + "." + matcher.group(3)) + matcher.group(4));
-            else if (classes.containsKey(packageIdentifier + "/" + matcher.group(3)))
+                newMainClassName = classes.get(matcher.group(2) + "." + matcher.group(3));
+            }
+            else if (classes.containsKey(packageIdentifier + "/" + matcher.group(3))) {
                 matcher.appendReplacement(nFile, matcher.group(1) + classes.get(packageIdentifier + "/" + matcher.group(3)) + matcher.group(4));
-            newMainClassName = classes.get(packageIdentifier + "/" + matcher.group(3));
+                newMainClassName = classes.get(packageIdentifier + "/" + matcher.group(3));
+            }
         }
         matcher.appendTail(nFile);
         manifestFile = nFile;
