@@ -128,7 +128,16 @@ public class Insertion implements Transformation {
         out.close();
     }
 
-
+    /**
+     * This method accepts the StringBuffer containing the smali file and reads through it inserting the garbage code
+     * <br>
+     * Once a match is found for the pattern, if canAddGarbage flag is true, then we can add garbage instructions such
+     * as useless conditional jumps. Only after we match the locals pattern, and we insert our new registers, we can
+     * ensure that all other junk instructions will work
+     *
+     * @param sb StringBuffer containing the smali code
+     * @return the StringBuffer with the modified code
+     */
     private StringBuffer garbage(StringBuffer sb) {
         Pattern pattern = Pattern.compile("(.locals )([0-9]*)|(invoke-)|(.end method)");
         Matcher matcher = pattern.matcher(sb.toString());
@@ -150,16 +159,17 @@ public class Insertion implements Transformation {
                     newRegs.add("v" + (nLocals + 2));
 
                     ArrayList<String> replacementContentFirst = new ArrayList<>();
-                    // at least 3 const, one for each allocated register
-                    replacementContentFirst.add(oneRegConst(junkInstr.getFirst(), newRegs.get(0)));
-                    replacementContentFirst.add(oneRegConst(junkInstr.getFirst(), newRegs.get(1)));
-                    replacementContentFirst.add(oneRegConst(junkInstr.getFirst(), newRegs.get(2)));
+                    // at least 3 initializations, one for each allocated register
+                    replacementContentFirst.add(oneRegConst(newRegs.get(0)));
+                    replacementContentFirst.add(oneRegConst(newRegs.get(1)));
+                    replacementContentFirst.add(oneRegConst(newRegs.get(2)));
 
                     // a register can be initialized multiple times
                     for (int i = 0; i < randInt(1, 10); i++)
-                        replacementContentFirst.add(oneRegConst(junkInstr.getFirst(), newRegs.get(randInt(0, newRegs.size() - 1))));
+                        replacementContentFirst.add(oneRegConst(newRegs.get(randInt(0, newRegs.size() - 1))));
+                    // adding lines of junk code that use the instantiated registers
                     for (int i = 0; i < randInt(1, 10); i++)
-                        replacementContentFirst.add(twoReg(junkInstr.get(randInt(1, 6)), newRegs.get(randInt(1, newRegs.size() - 1)), newRegs.get(randInt(0, newRegs.size() - 1))));
+                        replacementContentFirst.add(twoReg(junkInstr.get(randInt(0, 5)), newRegs.get(randInt(1, newRegs.size() - 1)), newRegs.get(randInt(0, newRegs.size() - 1))));
 
                     StringBuilder replacement = new StringBuilder(regDirective);
                     for (String s : replacementContentFirst)
@@ -170,14 +180,14 @@ public class Insertion implements Transformation {
                 }
             } else if (matcher.group(3) != null) // invoke-
             {
-                if (canAddGarbage) // add garbage to the first invoke- after locals allocation
+                if (canAddGarbage) // the registers were allocated in this method, so now we can add the following junk code
                 {
                     ArrayList<String> replacementContentSecond = new ArrayList<>();
 
                     for (int i = 0; i < randInt(1, 10); i++)
-                        replacementContentSecond.add(twoReg(junkInstr.get(randInt(1, 6)), newRegs.get(randInt(0, newRegs.size() - 1)), newRegs.get(randInt(0, newRegs.size() - 1))));
+                        replacementContentSecond.add(twoReg(junkInstr.get(randInt(0, 5)), newRegs.get(randInt(0, newRegs.size() - 1)), newRegs.get(randInt(0, newRegs.size() - 1))));
                     for (int i = 0; i < randInt(1, 10); i++)
-                        replacementContentSecond.add(twoRegJump(junkInstr.get(randInt(7, junkInstr.size() - 1)), newRegs.get(randInt(0, newRegs.size() - 1)), newRegs.get(randInt(0, newRegs.size() - 1))));
+                        replacementContentSecond.add(twoRegJump(junkInstr.get(randInt(6, junkInstr.size() - 1)), newRegs.get(randInt(0, newRegs.size() - 1)), newRegs.get(randInt(0, newRegs.size() - 1))));
 
                     StringBuilder replacement = new StringBuilder();
                     for (String s : replacementContentSecond)
@@ -199,21 +209,26 @@ public class Insertion implements Transformation {
         return nFile;
     }
 
-    private String oneRegConst(String ins, String reg) {
-        Scanner sc = new Scanner(ins);
-        sc.useDelimiter("VV");
-        String s = sc.next() + reg + sc.next();
-
-        Scanner sc1 = new Scanner(s);
-        sc1.useDelimiter("LL");
-        String toRet = sc1.next() + "0x0";
-
-        sc.close();
-        sc1.close();
-
-        return toRet + LS;
+    /**
+     * Method that given a register name returns a string of the initialization of the register setting it to the value
+     * of 0
+     *
+     * @param reg register to initialize
+     * @return the string containing the initialization
+     */
+    private static String oneRegConst(String reg) {
+        return "const/4 " + reg + ",0x0" + LS;
     }
 
+    /**
+     * Given an instruction (taken from the first six instructions in the junk_instr.txt file) and two registers, the
+     * method inserts the two registers in the instruction and returns it
+     *
+     * @param ins  instruction
+     * @param reg1 first register
+     * @param reg2 second register
+     * @return the string containing the line of junk code using the two registers
+     */
     private String twoReg(String ins, String reg1, String reg2) {
         Scanner sc = new Scanner(ins);
         sc.useDelimiter("VV");
@@ -224,6 +239,16 @@ public class Insertion implements Transformation {
         return s + LS;
     }
 
+    /**
+     * Given an instruction (taken from the seventh line onwards of the junk_instr.txt file) and two registers, the
+     * method inserts the two registers in the instruction and returns it<br>
+     * All instructions returned from this method will have a conditional jump, that jumps just to the next line
+     *
+     * @param ins  instruction
+     * @param reg1 first register
+     * @param reg2 second register
+     * @return the string containing the instruction with the two registers
+     */
     private String twoRegJump(String ins, String reg1, String reg2) {
         Scanner sc = new Scanner(ins);
         sc.useDelimiter("VV");

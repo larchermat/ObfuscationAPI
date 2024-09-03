@@ -13,8 +13,10 @@ import java.util.regex.Pattern;
 
 import static it.unibz.obfuscationapi.Utility.Utilities.*;
 
+/**
+ * Class that applies the nop to junk instruction transformation
+ */
 public class NopToJunk implements Transformation {
-
     final String COMPOUND_DELIM = "*";
     final ArrayList<String> dirsToExclude;
     final String path;
@@ -44,6 +46,10 @@ public class NopToJunk implements Transformation {
         }
     }
 
+    /**
+     * Loads all junk instructions from the junk_instr.txt file
+     * @return the arraylist containing all junk instructions
+     */
     private ArrayList<ArrayList<String>> loadJunkInstr() throws FileNotFoundException {
         ArrayList<ArrayList<String>> als = new ArrayList<>();
         InputStream is = NopToJunk.class.getResourceAsStream("/" + junkInstrFileName);

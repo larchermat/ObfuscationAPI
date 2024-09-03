@@ -1,5 +1,9 @@
 package it.unibz.obfuscationapi.Events;
 
+/**
+ * Enumeration composed of types of event we can send to the device while it executes the APK, to trigger the reaction
+ * from the application
+ */
 public enum EventType {
     BOOT_COMPLETED,
     BATT_FULL,

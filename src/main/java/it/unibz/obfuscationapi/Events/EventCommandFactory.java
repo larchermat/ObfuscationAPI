@@ -10,6 +10,10 @@ import it.unibz.obfuscationapi.Events.SYS.KeyEvent;
 
 import java.util.HashMap;
 
+/**
+ * Class that serves the purpose of returning an instance of {@link EventCommand EventCommand} based on the EventType
+ * passed
+ */
 public class EventCommandFactory {
     public static final HashMap<EventType, EventCommand> commandMap = new HashMap<>();
 

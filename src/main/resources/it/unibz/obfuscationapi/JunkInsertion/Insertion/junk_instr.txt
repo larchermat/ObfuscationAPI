@@ -1,4 +1,3 @@
-const/4 VV,LL
 move VV,VV
 mul-int/2addr VV,VV
 and-int/2addr VV,VV

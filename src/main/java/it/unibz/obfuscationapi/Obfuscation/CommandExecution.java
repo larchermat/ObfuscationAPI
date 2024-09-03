@@ -11,15 +11,16 @@ import static it.unibz.obfuscationapi.Utility.Utilities.LS;
 import static it.unibz.obfuscationapi.Utility.Utilities.writeErrorLog;
 import static java.lang.Thread.currentThread;
 
+/**
+ * Class containing the methods to execute the scripts in the scripts folder
+ */
 public class CommandExecution {
     public static final String os = System.getProperty("os.name").toLowerCase();
 
     /**
-     * Executes the scripts in the scripts folder to decompile the APK and generate the dumps of the dex files
+     * Executes the script in the scripts folder to decompile the APK and generate the dumps of the dex files
      *
      * @param pathToApk path to the original APK to decompile
-     * @throws IOException
-     * @throws InterruptedException
      */
     public static void decompileAPK(String pathToApk, String appName) throws IOException, InterruptedException {
         String errorLog;
@@ -51,10 +52,7 @@ public class CommandExecution {
     }
 
     /**
-     * Executes the scripts in the scripts folder to rebuild and sign the APK
-     *
-     * @throws IOException
-     * @throws InterruptedException
+     * Executes the script in the scripts folder to rebuild and sign the APK
      */
     public static void rebuildAPK(String appName, String obfuscation) throws IOException, InterruptedException {
         String errorLog;
@@ -81,11 +79,7 @@ public class CommandExecution {
     }
 
     /**
-     * Cleans up the decompiled directory deleting the packages added because of the transformations and reverting
-     * changes using git
-     *
-     * @throws IOException
-     * @throws InterruptedException
+     * Cleans up the decompiled directory deleting all added modifications because of the previous transformations
      */
     public static void cleanUp() throws IOException, InterruptedException {
         String errorLog;
@@ -116,8 +110,6 @@ public class CommandExecution {
      * snapshot that will be reused for every execution
      *
      * @param avd the name of the emulated device (usually model_API, Pixel_6_API_33)
-     * @throws IOException
-     * @throws InterruptedException
      */
     public static void prepareDevice(String avd, int port) throws IOException, InterruptedException {
         String errorLog;
@@ -125,7 +117,7 @@ public class CommandExecution {
         String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "prepareDevice.cmd", avd};
+            String[] cmd = {"cmd.exe", "/c", "prepareDevice.cmd", avd, String.valueOf(port)};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];
@@ -152,11 +144,9 @@ public class CommandExecution {
      * Starts the device loading the initial snapshot, installs the APK and grants (if any) the needed permissions to
      * run the application
      *
-     * @param appName         name of the APK
-     * @param avd             name of the emulated device
-     * @param port            port of the emulated device
-     * @throws IOException
-     * @throws InterruptedException
+     * @param appName name of the APK
+     * @param avd     name of the emulated device
+     * @param port    port of the emulated device
      */
     public static void installAPK(String appName, String avd, int port) throws IOException, InterruptedException {
         String errorLog;
@@ -197,8 +187,6 @@ public class CommandExecution {
      * @param pathToLog    path where we want to store the log locally
      * @param port         port of the emulated device
      * @param aEScript     script that is executed by adb to trigger an event
-     * @throws IOException
-     * @throws InterruptedException
      */
     public static void generateLog(String pkgName, String mainActivity, String pathToLog, int port, String aEScript) throws IOException, InterruptedException {
         String errorLog;
@@ -206,7 +194,7 @@ public class CommandExecution {
         String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pkgName, mainActivity, pathToLog, aEScript};
+            String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pkgName, mainActivity, pathToLog, String.valueOf(port), aEScript};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];
@@ -229,6 +217,17 @@ public class CommandExecution {
         reportError(errorLog, retCode, command, "generateLog");
     }
 
+    /**
+     * Method that prepares a StringBuilder with the information about the execution that failed and calls the
+     * {@link it.unibz.obfuscationapi.Utility.Utilities#writeErrorLog(StringBuilder) writeErrorLog(StringBuilder)}
+     * method to generate a log describing the error
+     *
+     * @param errorLog   output of the ErrorStream of the process that failed
+     * @param retCode    return code of the process that failed
+     * @param command    command that was executed
+     * @param methodName name of the method that executed the script
+     * @throws RuntimeException in case the return code is different from 0
+     */
     private static void reportError(String errorLog, int retCode, String command, String methodName) throws IOException {
         if (!errorLog.isBlank()) {
             StringBuilder args = new StringBuilder();
@@ -236,6 +235,7 @@ public class CommandExecution {
                     .append("Time: ").append(new Date(System.currentTimeMillis())).append(LS)
                     .append("Method: ").append(methodName).append(LS)
                     .append("Command: ").append(command).append(LS)
+                    .append("Return: ").append(retCode).append(LS)
                     .append("Error: ").append(LS).append(errorLog).append(LS);
             writeErrorLog(args);
         }
@@ -245,13 +245,12 @@ public class CommandExecution {
     }
 
     /**
-     * Executes a command and returns the exit code
+     * Executes a command and returns the exit code<br>
+     * The method registers the ErrorStream of the execution in case an error log should be generated
      *
      * @param args array containing the instructions that compose the command
      * @param file working directory in which the command is executed
      * @return the exit code
-     * @throws IOException
-     * @throws InterruptedException
      */
     private static String[] execCommand(String[] args, File file) throws IOException, InterruptedException {
         Runtime rt = Runtime.getRuntime();
