@@ -1,4 +1,4 @@
-package it.unibz.obfuscationapi.CallIndirection;
+package it.unibz.obfuscationapi.Transformation.CallIndirection;
 
 import it.unibz.obfuscationapi.Transformation.Transformation;
 

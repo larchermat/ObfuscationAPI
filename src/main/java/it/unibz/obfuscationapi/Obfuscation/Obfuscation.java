@@ -1,15 +1,15 @@
 package it.unibz.obfuscationapi.Obfuscation;
 
-import it.unibz.obfuscationapi.AdvancedReflection.AdvancedReflection;
-import it.unibz.obfuscationapi.ArithmeticBranching.ArithmeticBranching;
-import it.unibz.obfuscationapi.CallIndirection.CallIndirection;
-import it.unibz.obfuscationapi.CodeReorder.CodeReorder;
+import it.unibz.obfuscationapi.Transformation.AdvancedReflection.AdvancedReflection;
+import it.unibz.obfuscationapi.Transformation.ArithmeticBranching.ArithmeticBranching;
+import it.unibz.obfuscationapi.Transformation.CallIndirection.CallIndirection;
+import it.unibz.obfuscationapi.Transformation.CodeReorder.CodeReorder;
 import it.unibz.obfuscationapi.Events.EventCommandFactory;
 import it.unibz.obfuscationapi.Events.EventType;
-import it.unibz.obfuscationapi.IdentifierRenaming.IdentifierRenaming;
-import it.unibz.obfuscationapi.JunkInsertion.Insertion.Insertion;
-import it.unibz.obfuscationapi.JunkInsertion.NopToJunk.NopToJunk;
-import it.unibz.obfuscationapi.StringEncryption.StringEncryption;
+import it.unibz.obfuscationapi.Transformation.IdentifierRenaming.IdentifierRenaming;
+import it.unibz.obfuscationapi.Transformation.JunkInsertion.Insertion.Insertion;
+import it.unibz.obfuscationapi.Transformation.JunkInsertion.NopToJunk.NopToJunk;
+import it.unibz.obfuscationapi.Transformation.StringEncryption.StringEncryption;
 import it.unibz.obfuscationapi.Transformation.Transformation;
 
 import java.io.*;
@@ -27,7 +27,6 @@ import java.util.stream.Collectors;
 
 import static it.unibz.obfuscationapi.Obfuscation.CommandExecution.*;
 import static it.unibz.obfuscationapi.Utility.Utilities.*;
-import static java.lang.Thread.currentThread;
 
 /**
  * This class contains the methods to decompile and obfuscate an APK <br>
@@ -61,15 +60,17 @@ public class Obfuscation {
         smaliDirs.add(path + SEPARATOR + "smali");
         dexDumps = new ArrayList<>();
         setMultiDex();
-        avds.add(avdName);
-        for (int i = 2; i <= numAvds; i++) {
-            avds.add(avdName + "_" + i);
-        }
-        int port = 5554;
-        synchronized (portsByAvailability) {
-            for (int i = 0; i < numAvds; i++) {
-                portsByAvailability.put(port, Boolean.TRUE);
-                port += 2;
+        if (avdName != null) {
+            avds.add(avdName);
+            for (int i = 2; i <= numAvds; i++) {
+                avds.add(avdName + "_" + i);
+            }
+            int port = 5554;
+            synchronized (portsByAvailability) {
+                for (int i = 0; i < numAvds; i++) {
+                    portsByAvailability.put(port, Boolean.TRUE);
+                    port += 2;
+                }
             }
         }
     }
@@ -278,9 +279,7 @@ public class Obfuscation {
      */
     synchronized public void applyTransformation(Transformation transformation) {
         try {
-            System.out.println(currentThread().getName() + " started " + transformation.getClass().getSimpleName() + " transformation");
             transformation.obfuscate();
-            System.out.println(transformation.getClass().getSimpleName() + " transformation concluded successfully");
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

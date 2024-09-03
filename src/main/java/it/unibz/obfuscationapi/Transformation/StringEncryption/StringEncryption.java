@@ -1,4 +1,4 @@
-package it.unibz.obfuscationapi.StringEncryption;
+package it.unibz.obfuscationapi.Transformation.StringEncryption;
 
 import it.unibz.obfuscationapi.Obfuscation.CommandExecution;
 import it.unibz.obfuscationapi.Transformation.Transformation;

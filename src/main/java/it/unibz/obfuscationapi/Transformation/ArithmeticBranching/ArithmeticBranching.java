@@ -1,4 +1,4 @@
-package it.unibz.obfuscationapi.ArithmeticBranching;
+package it.unibz.obfuscationapi.Transformation.ArithmeticBranching;
 
 import it.unibz.obfuscationapi.Transformation.Transformation;
 

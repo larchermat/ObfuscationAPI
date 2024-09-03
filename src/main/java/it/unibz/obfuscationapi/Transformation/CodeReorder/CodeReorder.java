@@ -1,4 +1,4 @@
-package it.unibz.obfuscationapi.CodeReorder;
+package it.unibz.obfuscationapi.Transformation.CodeReorder;
 
 import it.unibz.obfuscationapi.Transformation.Transformation;
 import it.unibz.obfuscationapi.Utility.Utilities;

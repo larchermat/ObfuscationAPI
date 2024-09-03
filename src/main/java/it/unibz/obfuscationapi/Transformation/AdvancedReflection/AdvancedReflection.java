@@ -1,4 +1,4 @@
-package it.unibz.obfuscationapi.AdvancedReflection;
+package it.unibz.obfuscationapi.Transformation.AdvancedReflection;
 
 import it.unibz.obfuscationapi.Obfuscation.CommandExecution;
 import it.unibz.obfuscationapi.Transformation.Transformation;

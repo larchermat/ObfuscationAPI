@@ -1,4 +1,4 @@
-package it.unibz.obfuscationapi.IdentifierRenaming;
+package it.unibz.obfuscationapi.Transformation.IdentifierRenaming;
 
 import it.unibz.obfuscationapi.Transformation.Transformation;
 

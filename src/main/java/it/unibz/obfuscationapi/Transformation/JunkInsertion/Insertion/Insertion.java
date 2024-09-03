@@ -1,4 +1,4 @@
-package it.unibz.obfuscationapi.JunkInsertion.Insertion;
+package it.unibz.obfuscationapi.Transformation.JunkInsertion.Insertion;
 
 import it.unibz.obfuscationapi.Transformation.Transformation;
 import it.unibz.obfuscationapi.Utility.Utilities;
