@@ -21,7 +21,7 @@ there will be an obfuscated compiled version of the original APK
 If one intends to use the extended pipeline for producing the logs of the executions, instead of manually calling the
 applyTransformation method, simply call the methods to add the desired transformations and then call startSampling. The
 logs will be generated under the logs folder in the root directory; once the logs are created, the LogParser class can
-be used to generate trace.xes files parsing the log.txt files
+be used to generate dataset.xes files with partial traces, parsing the log.txt files
 
 ## Repository structure
 
@@ -41,5 +41,5 @@ be used to generate trace.xes files parsing the log.txt files
                                                   failures
 + logs                                          # directory containing all logs generated when running the extended
                                                   pipeline
-+ traces                                        # directory containing the trace.xes versions of the logs.txt
++ traces                                        # directory containing the dataset.xes produced by parsing the logs
 ```
