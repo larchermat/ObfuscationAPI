@@ -5,10 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.Scanner;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -18,7 +15,12 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
  * Class that performs the parsing of the log.txt files generating the trace.xes files
  */
 public class LogParser {
+    private static final int numLogsPerTest = 10;
     public static long start = System.currentTimeMillis();
+    private static int execNumber;
+    // We consider the executions of the same APK as if they are subsequent by keeping the total time passed since the
+    // start time
+    private static double eventTimestamp;
 
     /**
      * Takes all logs, parses them into xes traces and produces three datasets with partial traces:
@@ -36,7 +38,7 @@ public class LogParser {
                 Math.round(averageEventNum * 0.7)
         };
         for (int i = 0; i < eventsForDataset.length; i++) {
-            Path pathToDataset = Paths.get("traces");
+            Path pathToDataset = Paths.get("traces", "training");
             try {
                 if (!pathToDataset.toFile().exists()) {
                     Files.createDirectories(pathToDataset);
@@ -47,7 +49,22 @@ public class LogParser {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            generateTraces(eventsForDataset[i], pathToDataset);
+            generateTraces(eventsForDataset[i], pathToDataset, true);
+        }
+
+        for (int i = 0; i < eventsForDataset.length; i++) {
+            Path pathToDataset = Paths.get("traces", "testing");
+            try {
+                if (!pathToDataset.toFile().exists()) {
+                    Files.createDirectories(pathToDataset);
+                }
+                pathToDataset = pathToDataset.resolve("dataset" + (i + 1) + ".xes");
+                Files.deleteIfExists(pathToDataset);
+                Files.createFile(pathToDataset);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            generateTraces(eventsForDataset[i], pathToDataset, false);
         }
     }
 
@@ -57,7 +74,7 @@ public class LogParser {
      * @param numEvents     number of events each trace must include
      * @param pathToDataset path to the dataset file
      */
-    private static void generateTraces(long numEvents, Path pathToDataset) {
+    private static void generateTraces(long numEvents, Path pathToDataset, boolean training) {
         FileOutputStream fos;
         OutputStreamWriter osw;
         try {
@@ -74,24 +91,31 @@ public class LogParser {
         File[] apkDirs = logsDir.listFiles();
         assert apkDirs != null;
         for (File apkDir : apkDirs) {
+            // For the traces generated we include the time of execution for the sake of determining how
+            // much time passes in between calls. We can take the current time as the starting point of the
+            // executions because the date and hour are irrelevant, we just need the intervals
+            start = System.currentTimeMillis();
+            eventTimestamp = 0.0;
+            execNumber = 1;
             if (!apkDir.isDirectory()) continue;
             File[] obfDirs = apkDir.listFiles();
             if (obfDirs == null) continue;
             for (File obfDir : obfDirs) {
-                if (!obfDir.isDirectory()) continue;
+                if (!obfDir.isDirectory() ||
+                        (training && !obfDir.getPath().contains("unmodified"))) continue;
                 File[] eventDirs = obfDir.listFiles();
                 if (eventDirs == null) continue;
-                for (File eventDir : eventDirs) {
-                    if (!eventDir.isDirectory()) continue;
-                    File[] logFiles = eventDir.listFiles();
-                    if (logFiles == null) continue;
-                    ArrayList<String> logs = new ArrayList<>(Arrays.stream(logFiles).map(File::getPath).toList());
-                    // For the traces generated we include the time of execution for the sake of determining how
-                    // much time passes in between calls. We can take the current time as the starting point of the
-                    // executions because the date and hour are irrelevant, we just need the intervals
-                    start = System.currentTimeMillis();
-                    generateTrace(logs, numEvents, osw);
+                ArrayList<String> logs;
+                try {
+                    if (!training) {
+                        logs = new ArrayList<>(navigateDirectoryContents(obfDir.getPath(), null).stream().limit(numLogsPerTest).toList());
+                    } else {
+                        logs = navigateDirectoryContents(obfDir.getPath(), null);
+                    }
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
+                generateTrace(logs, numEvents, osw);
             }
         }
         try {
@@ -143,11 +167,7 @@ public class LogParser {
      */
     private static void generateTrace(ArrayList<String> logs, long numEvents, OutputStreamWriter osw) {
         StringBuilder sb = new StringBuilder();
-        logs.sort(String::compareTo);
         for (String log : logs) {
-            // We consider the executions as if they are subsequent by keeping the total time passed since the start
-            // time
-            double eventTimestamp = 0.0;
             StringBuffer contents;
             try {
                 contents = getStringBufferFromFile(log);
@@ -186,6 +206,7 @@ public class LogParser {
                 }
             }
             sb.append(TAB).append("</trace>").append(LS);
+            execNumber++;
         }
         try {
             osw.append(sb.toString());
@@ -205,17 +226,9 @@ public class LogParser {
         Scanner scanner = new Scanner(path);
         scanner.useDelimiter(SEPARATOR);
         scanner.next();
-        Pattern pattern = Pattern.compile("log([0-9]+)\\.txt");
-        Matcher matcher = pattern.matcher(path);
-        int i;
-        if (matcher.find()) {
-            i = Integer.parseInt(matcher.group(1));
-        } else {
-            throw new RuntimeException("Invalid path");
-        }
         return TAB + "<trace>" + LS +
                 TAB + TAB + "<string key=\"concept:name\" value=\"" + scanner.next() + "\"/>" + LS +
-                TAB + TAB + "<string key=\"execution:id\" value=\"Execution_" + i + "\"/>" + LS + LS;
+                TAB + TAB + "<string key=\"execution:id\" value=\"Execution_" + execNumber + "\"/>" + LS + LS;
     }
 
     /**

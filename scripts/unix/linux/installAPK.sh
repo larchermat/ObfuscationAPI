@@ -1,11 +1,13 @@
 #!/bin/bash
 
-if [ -z "$1" ] || [ -z "$2" ]; then
-  echo "Usage: $0 <name of APK> <name of AVD>"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
+  echo "Usage: $0 <path to APK> <name of AVD> <port>"
   exit 1
 fi
 
-p="$1"
+export ANDROID_SERIAL="emulator-$3"
+
+a="$1.apk"
 
 d="$2"
 
@@ -13,18 +15,33 @@ basePath=../../..
 
 adb=~/Android/Sdk/platform-tools/adb
 
-nohup ~/Android/sdk/emulator/emulator @"$d" -no-snapshot-save > /dev/null 2>&1 &
+nohup ~/Android/Sdk/emulator/emulator @"$d" -no-snapshot-save -port "$3" -no-boot-anim > /dev/null 2>&1 &
 
-timeout 60 "$adb" wait-for-device
+pattern="^1"
 
-if [ $? -ne 0 ]; then
-  echo "Emulator failed to start within the timeout period."
-  "$adb" emu kill
-  exit 1
-else
-  echo "Emulator started successfully."
-fi
+tmr=0
+
+while true; do
+    sleep 1
+
+    result=$("$adb" shell getprop sys.boot_completed)
+
+    if [[ "$result" =~ $pattern ]]; then
+        echo "Successfully started emu"
+        break
+    fi
+
+    tmr=$((tmr + 1))
+
+    if [ $tmr -gt 60 ]; then
+      echo "Timeout, device took too long to boot"
+      "$adb" emu kill
+      sleep 5
+      exit 1
+    fi
+
+done
 
 "$adb" root
 
-"$adb" install -g $basePath/decompiled/dist/"$p"
+"$adb" install -g $basePath/decompiled/"$a"

@@ -48,9 +48,12 @@ public class Obfuscation {
     public final HashMap<String, Boolean> avdsByAvailability = new HashMap<>();
     public final HashMap<Integer, Boolean> portsByAvailability = new HashMap<>();
     public final HashMap<String, Integer> logsByNumber = new HashMap<>();
+    private final ArrayList<EventType> eventTypes = new ArrayList<>();
+    private final boolean transform;
+    private final String family;
 
-    public Obfuscation(String pathToApk, int numAvds, String avdName, int logsPerCase) throws IOException, InterruptedException {
-        this.logsPerCase = logsPerCase;
+    public Obfuscation(String pathToApk, int numAvds, String avdName, int logsPerCase, ArrayList<EventType> eventTypes,
+                       boolean transform, String family) throws IOException, InterruptedException {
         transformations = new ArrayList<>();
         appName = pathToApk.substring(pathToApk.lastIndexOf(SEPARATOR) + 1).replace(".apk", "");
         decompileAPK(pathToApk, appName);
@@ -61,8 +64,7 @@ public class Obfuscation {
         dexDumps = new ArrayList<>();
         setMultiDex();
         if (avdName != null) {
-            avds.add(avdName);
-            for (int i = 2; i <= numAvds; i++) {
+            for (int i = 1; i <= numAvds; i++) {
                 avds.add(avdName + "_" + i);
             }
             int port = 5554;
@@ -73,6 +75,18 @@ public class Obfuscation {
                 }
             }
         }
+        if (eventTypes != null) {
+            this.eventTypes.addAll(eventTypes);
+            if (!this.eventTypes.isEmpty()) {
+                int totalCases = logsPerCase;
+                logsPerCase = Math.round((float) logsPerCase / this.eventTypes.size());
+                while (logsPerCase * this.eventTypes.size() < totalCases)
+                    logsPerCase++;
+            }
+        }
+        this.logsPerCase = logsPerCase;
+        this.transform = transform;
+        this.family = family;
     }
 
     /**
@@ -87,16 +101,27 @@ public class Obfuscation {
         for (String avd : avds) {
             executorService.submit(() -> initDevice(avd));
         }
-        Future<?> task = null;
-        for (Transformation t : transformations) {
-            task = executorService.submit(() -> applyTransformation(t));
-        }
-        do {
-            assert task != null;
-        } while (!task.isDone());
+        if (transform) {
+            Future<?> task = null;
+            for (Transformation t : transformations) {
+                task = executorService.submit(() -> applyTransformation(t));
+            }
+            do {
+                assert task != null;
+            } while (!task.isDone());
 
-        for (int i = 0; i < avds.size(); i++) {
-            executorService.submit(this::executeRuns);
+            for (int i = 0; i < avds.size(); i++) {
+                executorService.submit(this::executeRuns);
+            }
+        } else {
+            try {
+                buildAPK(null);
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            for (int i = 0; i < avds.size(); i++) {
+                executorService.submit(this::executeVanillaRuns);
+            }
         }
         executorService.shutdown();
         try {
@@ -108,8 +133,18 @@ public class Obfuscation {
         }
     }
 
+    public void createDevices(String systemImage) {
+        String avdName = avds.getFirst().substring(0, avds.getFirst().length() - 2);
+        try {
+            CommandExecution.createDevices(avdName, avds.size(), systemImage);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /**
      * Initializes a device with the given name
+     *
      * @param avd name of the device to initialize
      */
     private void initDevice(String avd) {
@@ -130,6 +165,7 @@ public class Obfuscation {
 
     /**
      * Returns the first available port dedicated to the execution of the emulated devices
+     *
      * @return the available port
      */
     private int findAvailablePort() {
@@ -275,6 +311,7 @@ public class Obfuscation {
 
     /**
      * Applies a chosen transformation to the decompiled APK and rebuilds it
+     *
      * @param transformation transformation to be applied
      */
     synchronized public void applyTransformation(Transformation transformation) {
@@ -320,6 +357,7 @@ public class Obfuscation {
      * Method returns the number of the log to be generated for a given log folder, incrementing the entry in the
      * logsByNumber hashMap for the given pathToLogs
      * If this number exceeds the logsPerCase value, then it returns null
+     *
      * @param pathToLogs path to the folder containing the logs
      * @return the number of the next log to be generated, null if the number exceeds the limit of logs per case
      */
@@ -523,9 +561,9 @@ public class Obfuscation {
     private void executeRuns() {
         for (Transformation t : transformations) {
             String transformation = t.getClass().getSimpleName();
-            for (EventType eventType : EventType.values()) {
+            for (EventType eventType : eventTypes) {
                 int exceptionCount = 0;
-                Path pathToLogs = Paths.get("logs", appName, transformation, eventType.toString());
+                Path pathToLogs = Paths.get("logs", family, transformation, eventType.toString());
                 if (!Files.exists(pathToLogs)) {
                     try {
                         Files.createDirectories(pathToLogs);
@@ -555,6 +593,47 @@ public class Obfuscation {
                         synchronized (portsByAvailability) {
                             portsByAvailability.put(port, Boolean.TRUE);
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Execute runs but using the normal version of the APK
+     */
+    private void executeVanillaRuns() {
+        for (EventType eventType : eventTypes) {
+            int exceptionCount = 0;
+            Path pathToLogs = Paths.get("logs", family, "unmodified", eventType.toString());
+            if (!Files.exists(pathToLogs)) {
+                try {
+                    Files.createDirectories(pathToLogs);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            while (true) {
+                Integer i = getLogNumber(pathToLogs);
+                if (i == null)
+                    break;
+                String avd = findAvailableDevice();
+                int port = findAvailablePort();
+                try {
+                    runApk(EventCommandFactory.getCommand(eventType).getCommand(), "unmodified", i, pathToLogs, avd, port);
+                } catch (IOException | InterruptedException e) {
+                    e.printStackTrace();
+                    exceptionCount++;
+                    if (exceptionCount >= 10) {
+                        System.out.println("Execution of " + appName + " " + eventType + ", continues stopping");
+                        break;
+                    }
+                } finally {
+                    synchronized (avdsByAvailability) {
+                        avdsByAvailability.put(avd, Boolean.TRUE);
+                    }
+                    synchronized (portsByAvailability) {
+                        portsByAvailability.put(port, Boolean.TRUE);
                     }
                 }
             }

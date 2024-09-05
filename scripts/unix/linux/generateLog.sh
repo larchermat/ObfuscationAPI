@@ -1,9 +1,11 @@
 #!/bin/bash
 
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
-  echo "Usage: $0 <package> </.main_activity> <path to local log.txt>"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
+  echo "Usage: $0 <package> </.main_activity> <path to local log.txt> <port>"
   exit 1
 fi
+
+export ANDROID_SERIAL="emulator-$4"
 
 p="$1"
 
@@ -14,9 +16,9 @@ adb=~/Android/Sdk/platform-tools/adb
 tmr=0
 
 while true; do
-  sleep 5
+  sleep 1
 
-  tmr=$((tmr + 5))
+  tmr=$((tmr + 1))
 
   pid=$("$adb" shell pidof "$p")
 
@@ -27,14 +29,15 @@ while true; do
   if [ $tmr -gt 60 ]; then
           echo "Timeout, app took too long to start"
           "$adb" emu kill
+          sleep 5
           exit 1
       fi
 done
 
-"$adb" shell /data/local/tmp/strace -p "$pid" -o /data/local/tmp/strace_output.txt
+"$adb" shell strace -r -T -x -p "$pid" -o /data/local/tmp/strace_output.txt &
 
-if [ -n "$4" ]; then
-  "$adb" shell "$4"
+if [ -n "$5" ]; then
+  "$adb" shell "$5"
 fi
 
 sleep 5
@@ -45,12 +48,4 @@ sleep 5
 
 "$adb" emu kill
 
-pattern="^List of devices attached$"
-
-while true; do
-  result=$("$adb" devices)
-
-  if [[ "$result" =~ $pattern ]]; then
-    break
-  fi
-done
+sleep 10

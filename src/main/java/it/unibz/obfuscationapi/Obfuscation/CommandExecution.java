@@ -58,6 +58,7 @@ public class CommandExecution {
         String errorLog;
         int retCode;
         String command;
+        obfuscation = obfuscation == null ? "" : obfuscation;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "rebuildAPK.cmd", appName, obfuscation};
@@ -68,6 +69,43 @@ public class CommandExecution {
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             File file = new File(Paths.get("scripts", "unix").toString());
             String[] cmd = {"bash", "rebuildAPK.sh", appName, obfuscation};
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
+        } else {
+            throw new RuntimeException("Unsupported OS: " + os);
+        }
+        reportError(errorLog, retCode, command, "rebuildAPK");
+    }
+
+    /**
+     * Creates as many android emulated devices as requested, following the naming convention used by the Obfuscation
+     * class
+     *
+     * @param deviceName  base name for all devices
+     * @param n           number of devices
+     * @param systemImage system image string used by avdmanager
+     */
+    public static void createDevices(String deviceName, int n, String systemImage) throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
+        if (os.contains("win")) {
+            File file = new File(Paths.get("scripts", "win").toString());
+            String[] cmd = {"cmd.exe", "/c", "createDevices.cmd", deviceName, String.valueOf(n), systemImage};
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
+        } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            Path path = Paths.get("scripts", "unix");
+            if (os.contains("mac"))
+                path = path.resolve("mac");
+            else
+                path = path.resolve("linux");
+            File file = new File(path.toString());
+            String[] cmd = {"bash", "createDevices.sh", deviceName, String.valueOf(n), systemImage};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];

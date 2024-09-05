@@ -3,10 +3,12 @@
 # This script starts the emulator wiping the device data and closes it to create a first snapshot that will be loaded
 # everytime we execute an APK
 
-if [ -z "$1" ]; then
-  echo "Usage: $0 <name of AVD>"
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Usage: $0 <name of AVD> <port>"
   exit 1
 fi
+
+export ANDROID_SERIAL="emulator-$2"
 
 d="$1"
 
@@ -19,28 +21,34 @@ fi
 
 echo "The device's data will be wiped"
 
-nohup ~/Android/Sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load > /dev/null 2>&1 &
+nohup ~/Android/Sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load -port "$2" -no-boot-anim > /dev/null 2>&1 &
 
-timeout 60 "$adb" wait-for-device
+pattern="^1"
 
-if [ $? -ne 0 ]; then
-  echo "Emulator failed to start within the timeout period."
-  "$adb" emu kill
-  exit 1
-else
-  echo "Emulator started successfully."
-fi
+tmr=0
+
+while true; do
+    sleep 1
+
+    result=$("$adb" shell getprop sys.boot_completed)
+
+    if [[ "$result" =~ $pattern ]]; then
+        echo "Successfully started emu"
+        break
+    fi
+
+    tmr=$((tmr + 1))
+
+    if [ $tmr -gt 60 ]; then
+        echo "Timeout, device took too long to boot"
+        "$adb" emu kill
+        sleep 5
+        exit 1
+    fi
+done
 
 "$adb" root
 
 "$adb" emu kill
 
-pattern="^List of devices attached$"
-
-while true; do
-  result=$("$adb" devices)
-
-  if [[ "$result" =~ $pattern ]]; then
-    break
-  fi
-done
+sleep 10
