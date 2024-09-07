@@ -39,7 +39,9 @@ printf "dist\nbuild" > .gitignore
 
 git init > /dev/null 2>&1 || exit 1
 
-git config core.safecrlf false > /dev/null 2>&1
+git config user.email "e@mail.com" > /dev/null 2>&1
+
+git config user.name "User Name" > /dev/null 2>&1
 
 git add -A > /dev/null 2>&1
 

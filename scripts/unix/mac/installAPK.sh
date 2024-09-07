@@ -15,7 +15,7 @@ basePath=../../..
 
 adb=~/Library/Android/sdk/platform-tools/adb
 
-nohup ~/Library/Android/sdk/emulator/emulator @"$d" -no-snapshot-save -port "$3" -no-boot-anim > /dev/null 2>&1 &
+nohup ~/Library/Android/sdk/emulator/emulator @"$d" -no-snapshot-save -port "$3" -no-window > /dev/null 2>&1 &
 
 pattern="^1"
 

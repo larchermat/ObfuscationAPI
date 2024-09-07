@@ -1,11 +1,11 @@
 package it.unibz.obfuscationapi.Obfuscation;
 
+import it.unibz.obfuscationapi.Events.EventCommandFactory;
+import it.unibz.obfuscationapi.Events.EventType;
 import it.unibz.obfuscationapi.Transformation.AdvancedReflection.AdvancedReflection;
 import it.unibz.obfuscationapi.Transformation.ArithmeticBranching.ArithmeticBranching;
 import it.unibz.obfuscationapi.Transformation.CallIndirection.CallIndirection;
 import it.unibz.obfuscationapi.Transformation.CodeReorder.CodeReorder;
-import it.unibz.obfuscationapi.Events.EventCommandFactory;
-import it.unibz.obfuscationapi.Events.EventType;
 import it.unibz.obfuscationapi.Transformation.IdentifierRenaming.IdentifierRenaming;
 import it.unibz.obfuscationapi.Transformation.JunkInsertion.Insertion.Insertion;
 import it.unibz.obfuscationapi.Transformation.JunkInsertion.NopToJunk.NopToJunk;
@@ -16,7 +16,10 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -26,7 +29,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static it.unibz.obfuscationapi.Obfuscation.CommandExecution.*;
-import static it.unibz.obfuscationapi.Utility.Utilities.*;
+import static it.unibz.obfuscationapi.Utility.Utilities.SEPARATOR;
+import static it.unibz.obfuscationapi.Utility.Utilities.getStringBufferFromFile;
 
 /**
  * This class contains the methods to decompile and obfuscate an APK <br>
@@ -36,7 +40,7 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
  * an event and collecting the log of the execution in the logs folder
  */
 public class Obfuscation {
-    private final int logsPerCase;
+    private int logsPerCase;
     private final String path;
     private String pkg;
     private final ArrayList<String> smaliDirs;
@@ -49,7 +53,7 @@ public class Obfuscation {
     public final HashMap<Integer, Boolean> portsByAvailability = new HashMap<>();
     public final HashMap<String, Integer> logsByNumber = new HashMap<>();
     private final ArrayList<EventType> eventTypes = new ArrayList<>();
-    private final boolean transform;
+    private boolean transform;
     private final String family;
 
     public Obfuscation(String pathToApk, int numAvds, String avdName, int logsPerCase, ArrayList<EventType> eventTypes,
@@ -89,6 +93,20 @@ public class Obfuscation {
         this.family = family;
     }
 
+    public void setTransform(boolean transform) {
+        this.transform = transform;
+    }
+
+    public void setLogsPerCase(int logsPerCase) {
+        if (!eventTypes.isEmpty()) {
+            int totalCases = logsPerCase;
+            logsPerCase = Math.round((float) logsPerCase / eventTypes.size());
+            while (logsPerCase * eventTypes.size() < totalCases)
+                logsPerCase++;
+        }
+        this.logsPerCase = logsPerCase;
+    }
+
     /**
      * Runs the complete pipeline for the generation of the log.txt files <br>
      * An {@link ExecutorService ExecutorService} is used, initializing a fixed thread pool of n threads, with n being
@@ -96,11 +114,12 @@ public class Obfuscation {
      * It then initializes all devices, applies all selected transformations, and submits n
      * {@link Obfuscation#executeRuns() executeRuns()} tasks
      */
-    public void startSampling() {
+    public void startSampling(boolean initDevices) {
         ExecutorService executorService = Executors.newFixedThreadPool(avds.size());
         for (String avd : avds) {
-            executorService.submit(() -> initDevice(avd));
+            executorService.submit(() -> initDevice(avd, initDevices));
         }
+
         if (transform) {
             Future<?> task = null;
             for (Transformation t : transformations) {
@@ -125,11 +144,17 @@ public class Obfuscation {
         }
         executorService.shutdown();
         try {
-            if (!executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS)) {
+            if (!executorService.awaitTermination(1800, TimeUnit.SECONDS)) {
                 executorService.shutdownNow();
             }
         } catch (InterruptedException e) {
             executorService.shutdownNow();
+        } finally {
+            try {
+                shutdownEmus();
+            } catch (IOException | InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -147,18 +172,24 @@ public class Obfuscation {
      *
      * @param avd name of the device to initialize
      */
-    private void initDevice(String avd) {
-        int port = findAvailablePort();
-        try {
-            prepareDevice(avd, port);
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException(e);
-        } finally {
+    private void initDevice(String avd, boolean initDevices) {
+        if (initDevices) {
+            int port = findAvailablePort();
+            try {
+                prepareDevice(avd, port);
+            } catch (IOException | InterruptedException e) {
+                throw new RuntimeException(e);
+            } finally {
+                synchronized (avdsByAvailability) {
+                    avdsByAvailability.put(avd, Boolean.TRUE);
+                }
+                synchronized (portsByAvailability) {
+                    portsByAvailability.put(port, Boolean.TRUE);
+                }
+            }
+        } else {
             synchronized (avdsByAvailability) {
                 avdsByAvailability.put(avd, Boolean.TRUE);
-            }
-            synchronized (portsByAvailability) {
-                portsByAvailability.put(port, Boolean.TRUE);
             }
         }
     }
@@ -350,7 +381,7 @@ public class Obfuscation {
         String pathToApk = appName + SEPARATOR + "dist" + SEPARATOR + transformation + SEPARATOR + appName;
         installAPK(pathToApk, avd, port);
         String pathToLogFile = pathToLogs.resolve("log" + logNumber + ".txt").toAbsolutePath().toString();
-        generateLog(pkg.replace("/", "."), mainActivity, pathToLogFile, port, AE);
+        generateLog(pathToApk, pathToLogFile, port, AE);
     }
 
     /**

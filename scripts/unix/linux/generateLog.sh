@@ -1,17 +1,19 @@
 #!/bin/bash
 
-if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
-  echo "Usage: $0 <package> </.main_activity> <path to local log.txt> <port>"
+if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ]; then
+  echo "Usage: $0 <path_to_apk> <path to local log.txt> <port>"
   exit 1
 fi
 
-export ANDROID_SERIAL="emulator-$4"
-
-p="$1"
+export ANDROID_SERIAL="emulator-$3"
 
 adb=~/Android/Sdk/platform-tools/adb
 
-"$adb" shell am start -n "$p$2"
+aapt=~/Android/Sdk/build-tools/34.0.0/aapt
+
+p=$("$aapt" dump badging "../../../decompiled/$1.apk" | grep "package: name=" | sed 's/package: name=//g' | sed 's/ versionCode.*//g' | sed "s/\'//g")
+
+"$adb" shell monkey -p "$p" -c android.intent.category.LAUNCHER 1
 
 tmr=0
 
@@ -26,7 +28,7 @@ while true; do
     break
   fi
 
-  if [ $tmr -gt 60 ]; then
+  if [ $tmr -gt 30 ]; then
           echo "Timeout, app took too long to start"
           "$adb" emu kill
           sleep 5
@@ -36,15 +38,15 @@ done
 
 "$adb" shell strace -r -T -x -p "$pid" -o /data/local/tmp/strace_output.txt &
 
-if [ -n "$5" ]; then
-  "$adb" shell "$5"
+if [ -n "$4" ]; then
+  "$adb" shell "$4"
 fi
 
 sleep 5
 
 "$adb" shell am force-stop "$p"
 
-"$adb" pull /data/local/tmp/strace_output.txt "$3"
+"$adb" pull /data/local/tmp/strace_output.txt "$2"
 
 "$adb" emu kill
 

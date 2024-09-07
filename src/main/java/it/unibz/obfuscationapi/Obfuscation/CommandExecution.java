@@ -51,6 +51,24 @@ public class CommandExecution {
         reportError(errorLog, retCode, command, "decompileAPK");
     }
 
+    public static void shutdownEmus() throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
+        if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            Path path = Paths.get("scripts", "unix", "linux");
+            File file = new File(path.toString());
+            String[] cmd = {"bash", "closeAllEmus.sh"};
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
+        } else {
+            throw new RuntimeException("Unsupported OS: " + os);
+        }
+        reportError(errorLog, retCode, command, "decompileAPK");
+    }
+
     /**
      * Executes the script in the scripts folder to rebuild and sign the APK
      */
@@ -220,19 +238,19 @@ public class CommandExecution {
      * Runs the script that starts the application attaching strace to it, records the execution after sending an event
      * (if any), saves the log in the specified file and closes the emulator without saving
      *
-     * @param pkgName      name of the application package
-     * @param mainActivity entry point of the application
+     * @param pathToApk    path to the APK file
      * @param pathToLog    path where we want to store the log locally
      * @param port         port of the emulated device
      * @param aEScript     script that is executed by adb to trigger an event
      */
-    public static void generateLog(String pkgName, String mainActivity, String pathToLog, int port, String aEScript) throws IOException, InterruptedException {
+    public static void generateLog(String pathToApk, String pathToLog, int port, String aEScript) throws IOException, InterruptedException {
         String errorLog;
         int retCode;
         String command;
+        aEScript = wrap(aEScript);
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pkgName, mainActivity, pathToLog, String.valueOf(port), aEScript};
+            String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pathToApk, pathToLog, String.valueOf(port), aEScript};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];
@@ -244,7 +262,7 @@ public class CommandExecution {
             else
                 path = path.resolve("linux");
             File file = new File(path.toString());
-            String[] cmd = {"bash", "generateLog.sh", pkgName, mainActivity, pathToLog, String.valueOf(port), aEScript};
+            String[] cmd = {"bash", "generateLog.sh", pathToApk, pathToLog, String.valueOf(port), aEScript};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];
@@ -276,9 +294,9 @@ public class CommandExecution {
                     .append("Return: ").append(retCode).append(LS)
                     .append("Error: ").append(LS).append(errorLog).append(LS);
             writeErrorLog(args);
-        }
-        if (retCode != 0) {
-            throw new RuntimeException(os + " command \"" + command + "\" failed");
+            if (retCode != 0) {
+                throw new RuntimeException(os + " command \"" + command + "\" failed");
+            }
         }
     }
 
@@ -316,5 +334,9 @@ public class CommandExecution {
             log = matcher.replaceAll("").trim();
         }
         return new String[]{String.valueOf(pr.waitFor()), log};
+    }
+
+    public static String wrap(String string) {
+        return "\"" + string + "\"";
     }
 }

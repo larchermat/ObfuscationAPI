@@ -21,7 +21,7 @@ fi
 
 echo "The device's data will be wiped"
 
-nohup ~/Library/Android/sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load -port "$2" -no-boot-anim > /dev/null 2>&1 &
+nohup ~/Library/Android/sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load -port "$2" > /dev/null 2>&1 &
 
 pattern="^1"
 
