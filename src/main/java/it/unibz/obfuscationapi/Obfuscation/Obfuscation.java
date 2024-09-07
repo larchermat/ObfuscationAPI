@@ -116,27 +116,36 @@ public class Obfuscation {
      */
     public void startSampling(boolean initDevices) {
         ExecutorService executorService = Executors.newFixedThreadPool(avds.size());
+        ArrayList<Future<?>> tasks = new ArrayList<>();
         for (String avd : avds) {
-            executorService.submit(() -> initDevice(avd, initDevices));
+            tasks.add(executorService.submit(() -> initDevice(avd, initDevices)));
         }
+        boolean cond;
+        do {
+            cond = tasks.stream().allMatch(Future::isDone);
+        } while (!cond);
 
         if (transform) {
-            Future<?> task = null;
+            tasks = new ArrayList<>();
             for (Transformation t : transformations) {
-                task = executorService.submit(() -> applyTransformation(t));
+                tasks.add(executorService.submit(() -> applyTransformation(t)));
             }
             do {
-                assert task != null;
-            } while (!task.isDone());
+                cond = tasks.stream().allMatch(Future::isDone);
+            } while (!cond);
 
             for (int i = 0; i < avds.size(); i++) {
                 executorService.submit(this::executeRuns);
             }
         } else {
-            try {
-                buildAPK(null);
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException(e);
+            Future<?> task = executorService.submit(() -> {
+                try {
+                    buildAPK(null);
+                } catch (IOException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+            while (!task.isDone()) {
             }
             for (int i = 0; i < avds.size(); i++) {
                 executorService.submit(this::executeVanillaRuns);
@@ -379,9 +388,10 @@ public class Obfuscation {
             mainActivity = this.mainActivity;
         }
         String pathToApk = appName + SEPARATOR + "dist" + SEPARATOR + transformation + SEPARATOR + appName;
-        installAPK(pathToApk, avd, port);
+        //installAPK(pathToApk, avd, port);
         String pathToLogFile = pathToLogs.resolve("log" + logNumber + ".txt").toAbsolutePath().toString();
-        generateLog(pathToApk, pathToLogFile, port, AE);
+        together(pathToApk, avd, pathToLogFile, port, AE);
+        //generateLog(pathToApk, pathToLogFile, port, AE);
     }
 
     /**

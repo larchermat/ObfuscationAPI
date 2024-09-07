@@ -33,7 +33,7 @@ while true; do
 
     tmr=$((tmr + 1))
 
-    if [ $tmr -gt 60 ]; then
+    if [ $tmr -gt 30 ]; then
       echo "Timeout, device took too long to boot"
       "$adb" emu kill
       sleep 5

@@ -15,7 +15,7 @@ basePath=../../..
 
 adb=~/Library/Android/sdk/platform-tools/adb
 
-nohup ~/Library/Android/sdk/emulator/emulator @"$d" -no-snapshot-save -port "$3" -no-window > /dev/null 2>&1 &
+nohup ~/Library/Android/sdk/emulator/emulator @"$d" -no-snapshot-save -port "$3" > /dev/null 2>&1 &
 
 pattern="^1"
 
@@ -24,8 +24,9 @@ tmr=0
 while true; do
     sleep 1
 
+    echo "Before result" >&2
     result=$("$adb" shell getprop sys.boot_completed)
-
+    echo "After result" >&2
     if [[ "$result" =~ $pattern ]]; then
         echo "Successfully started emu"
         break
@@ -33,8 +34,8 @@ while true; do
 
     tmr=$((tmr + 1))
 
-    if [ $tmr -gt 60 ]; then
-      echo "Timeout, device took too long to boot"
+    if [ $tmr -gt 30 ]; then
+      echo "Timeout, device took too long to boot" >&2
       "$adb" emu kill
       sleep 5
       exit 1
@@ -42,6 +43,10 @@ while true; do
 
 done
 
-"$adb" root
+echo "adb root" >&2
 
-"$adb" install -g $basePath/decompiled/"$a"
+"$adb" root >&2
+
+echo "adb install" >&2
+
+"$adb" install -g $basePath/decompiled/"$a" >&2

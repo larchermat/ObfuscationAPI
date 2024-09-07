@@ -29,7 +29,7 @@ while true; do
   fi
 
   if [ $tmr -gt 30 ]; then
-          echo "Timeout, app took too long to start"
+          echo "Timeout, app took too long to start" >&2
           "$adb" emu kill
           sleep 5
           exit 1
@@ -46,7 +46,7 @@ sleep 5
 
 "$adb" shell am force-stop "$p"
 
-"$adb" pull /data/local/tmp/strace_output.txt "$2"
+"$adb" pull /data/local/tmp/strace_output.txt "$2" >&2
 
 "$adb" emu kill
 

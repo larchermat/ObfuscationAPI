@@ -15,6 +15,19 @@ import static java.lang.Thread.currentThread;
  * Class containing the methods to execute the scripts in the scripts folder
  */
 public class CommandExecution {
+    private static final String excludedOut = """
+            (args: \\[--pct-syskeys, 0, -p, .*?\\..*?\\..*?, -c, android\\.intent\\.category\\.LAUNCHER, 1]
+             arg: "--pct-syskeys"
+             arg: "0"
+             arg: "-p"
+             arg: ".*?\\..*?\\..*?"
+             arg: "-c"
+             arg: "android\\.intent\\.category\\.LAUNCHER"
+             arg: "1"
+            arg="--pct-syskeys" mCurArgData="null" mNextArg=1 argwas="--pct-syskeys" nextarg="0"
+            data="0"
+            data=".*?\\..*?\\..*?"
+            data="android\\.intent\\.category\\.LAUNCHER")""";
     public static final String os = System.getProperty("os.name").toLowerCase();
 
     /**
@@ -55,8 +68,8 @@ public class CommandExecution {
         String errorLog;
         int retCode;
         String command;
-        if (os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-            Path path = Paths.get("scripts", "unix", "linux");
+        if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            Path path = Paths.get("scripts", "unix");
             File file = new File(path.toString());
             String[] cmd = {"bash", "closeAllEmus.sh"};
             String[] ret = execCommand(cmd, file);
@@ -66,7 +79,7 @@ public class CommandExecution {
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
-        reportError(errorLog, retCode, command, "decompileAPK");
+        reportError(errorLog, retCode, command, "shutdownEmus");
     }
 
     /**
@@ -131,7 +144,7 @@ public class CommandExecution {
         } else {
             throw new RuntimeException("Unsupported OS: " + os);
         }
-        reportError(errorLog, retCode, command, "rebuildAPK");
+        reportError(errorLog, retCode, command, "createDevices");
     }
 
     /**
@@ -247,7 +260,6 @@ public class CommandExecution {
         String errorLog;
         int retCode;
         String command;
-        aEScript = wrap(aEScript);
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
             String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pathToApk, pathToLog, String.valueOf(port), aEScript};
@@ -273,6 +285,35 @@ public class CommandExecution {
         reportError(errorLog, retCode, command, "generateLog");
     }
 
+    public static void together(String pathToApk, String avd, String pathToLog, int port, String aEScript) throws IOException, InterruptedException {
+        String errorLog;
+        int retCode;
+        String command;
+        if (os.contains("win")) {
+            File file = new File(Paths.get("scripts", "win").toString());
+            String[] cmd = {"cmd.exe", "/c", "together.cmd", pathToApk, avd, pathToLog, String.valueOf(port), aEScript};
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
+        } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
+            Path path = Paths.get("scripts", "unix");
+            if (os.contains("mac"))
+                path = path.resolve("mac");
+            else
+                path = path.resolve("linux");
+            File file = new File(path.toString());
+            String[] cmd = {"bash", "together.sh", pathToApk, avd, pathToLog, String.valueOf(port), aEScript};
+            String[] ret = execCommand(cmd, file);
+            retCode = Integer.parseInt(ret[0]);
+            errorLog = ret[1];
+            command = String.join(" ", cmd);
+        } else {
+            throw new RuntimeException("Unsupported OS: " + os);
+        }
+        reportError(errorLog, retCode, command, "together");
+    }
+
     /**
      * Method that prepares a StringBuilder with the information about the execution that failed and calls the
      * {@link it.unibz.obfuscationapi.Utility.Utilities#writeErrorLog(StringBuilder) writeErrorLog(StringBuilder)}
@@ -294,9 +335,9 @@ public class CommandExecution {
                     .append("Return: ").append(retCode).append(LS)
                     .append("Error: ").append(LS).append(errorLog).append(LS);
             writeErrorLog(args);
-            if (retCode != 0) {
-                throw new RuntimeException(os + " command \"" + command + "\" failed");
-            }
+        }
+        if (retCode != 0) {
+            throw new RuntimeException(os + " command \"" + command + "\" failed");
         }
     }
 
@@ -328,6 +369,7 @@ public class CommandExecution {
                     "(.*?strace: 1 file pushed, 0 skipped.*?\\))|" +
                     "(All files should be loaded\\. Notifying the device\\.)|" +
                     "(strace: Process [0-9]+ attached)|" +
+                    excludedOut + "|" +
                     "(^$)";
             Pattern pattern = Pattern.compile(reg);
             Matcher matcher = pattern.matcher(sb);
