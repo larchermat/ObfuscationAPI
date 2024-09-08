@@ -20,12 +20,11 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 public class StringEncryption implements Transformation {
     private final ArrayList<String> dirsToExclude;
     private final String path;
-    private final String decryptionSrcFile = Paths.get( "it", "unibz", "obfuscationapi", "StringEncryption", "Decryption.txt").toString();
+    private final String decryptionSrcFile = Paths.get("it", "unibz", "obfuscationapi", "StringEncryption", "Decryption.txt").toString();
 
     /**
-     *
      * @param dirsToExclude list of directories to exclude from the transformation
-     * @param path path to the package of the APK
+     * @param path          path to the package of the APK
      */
     public StringEncryption(String path, ArrayList<String> dirsToExclude) {
         this.path = path;
@@ -126,10 +125,17 @@ public class StringEncryption implements Transformation {
         StringBuilder nFile = new StringBuilder();
         while (matcher.find()) {
             int reg = Integer.parseInt(matcher.group(3));
-            if (reg > 15)
+            if (reg > 15 || matcher.group(5).equals("\"\""))
                 continue;
             String key = "\"" + applyCaesar(matcher.group(5).substring(1, matcher.group(5).length() - 1), 2) + "\"";
-            if (key.equals(matcher.group(5)))
+            boolean cond = false;
+            for (int i = 1; i < key.length() - 1; i++) {
+                if (matcher.group(5).charAt(i) == key.charAt(i)) {
+                    cond = true;
+                    break;
+                }
+            }
+            if (cond)
                 continue;
             String insert = "    invoke-static {" + matcher.group(2) +
                     "}, Lcom/123456789/Decrypter;->applyCaesar(Ljava/lang/String;)Ljava/lang/String;" + LS +
@@ -148,7 +154,7 @@ public class StringEncryption implements Transformation {
     /**
      * Encodes a string using the Caesar cipher with a specific shift
      *
-     * @param text text to encode
+     * @param text  text to encode
      * @param shift shift applied in the encryption
      * @return
      */
