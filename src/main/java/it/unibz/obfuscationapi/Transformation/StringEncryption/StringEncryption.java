@@ -120,7 +120,7 @@ public class StringEncryption implements Transformation {
      */
     private void process(String filePath) throws IOException {
         StringBuffer text = getStringBufferFromFile(filePath);
-        Pattern pattern = Pattern.compile("(const-string(?:/jumbo)? )([pv]([0-9]+))(, )(\".*\")");
+        Pattern pattern = Pattern.compile("(const-string(?:/jumbo)? )(v([0-9]+))(, )(\".*\")");
         Matcher matcher = pattern.matcher(text.toString());
         StringBuilder nFile = new StringBuilder();
         while (matcher.find()) {
