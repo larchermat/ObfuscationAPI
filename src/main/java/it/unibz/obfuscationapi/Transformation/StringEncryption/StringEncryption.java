@@ -121,18 +121,19 @@ public class StringEncryption implements Transformation {
      */
     private void process(String filePath) throws IOException {
         StringBuffer text = getStringBufferFromFile(filePath);
-        Pattern pattern = Pattern.compile("(const-string(/jumbo)? )([a-z][0-9]+)(, )(\".*\")");
+        Pattern pattern = Pattern.compile("(const-string(?:/jumbo)? )([pv]([0-9]+))(, )(\".*\")");
         Matcher matcher = pattern.matcher(text.toString());
         StringBuilder nFile = new StringBuilder();
-        int times = 0;
-        while (matcher.find() && times <= 15) {
+        while (matcher.find()) {
+            int reg = Integer.parseInt(matcher.group(3));
+            if (reg > 15)
+                continue;
             String key = "\"" + applyCaesar(matcher.group(5).substring(1, matcher.group(5).length() - 1), 2) + "\"";
-            String insert = "    invoke-static {" + matcher.group(3) +
+            String insert = "    invoke-static {" + matcher.group(2) +
                     "}, Lcom/123456789/Decrypter;->applyCaesar(Ljava/lang/String;)Ljava/lang/String;" + LS +
-                    "    move-result-object " + matcher.group(3);
-            String replacement = matcher.group(1) + matcher.group(3) + matcher.group(4) + key + LS + insert;
+                    "    move-result-object " + matcher.group(2);
+            String replacement = matcher.group(1) + matcher.group(2) + matcher.group(4) + key + LS + insert;
             matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
-            times++;
         }
         matcher.appendTail(nFile);
 
