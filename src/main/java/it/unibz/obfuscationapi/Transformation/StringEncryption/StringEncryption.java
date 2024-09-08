@@ -129,6 +129,8 @@ public class StringEncryption implements Transformation {
             if (reg > 15)
                 continue;
             String key = "\"" + applyCaesar(matcher.group(5).substring(1, matcher.group(5).length() - 1), 2) + "\"";
+            if (key.equals(matcher.group(5)))
+                continue;
             String insert = "    invoke-static {" + matcher.group(2) +
                     "}, Lcom/123456789/Decrypter;->applyCaesar(Ljava/lang/String;)Ljava/lang/String;" + LS +
                     "    move-result-object " + matcher.group(2);
