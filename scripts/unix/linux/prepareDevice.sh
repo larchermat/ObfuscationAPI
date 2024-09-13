@@ -21,7 +21,7 @@ fi
 
 echo "The device's data will be wiped"
 
-~/Android/Sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load -port "$2" > /dev/null 2>&1 &
+~/Android/Sdk/emulator/emulator @"$d" -wipe-data -no-snapshot-load -port "$2" -no-window > /dev/null 2>&1 &
 
 pattern="^1"
 
@@ -39,7 +39,7 @@ while true; do
 
     tmr=$((tmr + 1))
 
-    if [ $tmr -gt 60 ]; then
+    if [ $tmr -gt 120 ]; then
         echo "Timeout, device took too long to boot" >&2
         "$adb" emu kill
         sleep 5
@@ -47,8 +47,8 @@ while true; do
     fi
 done
 
-ping 127.0.0.1 -t 20
+sleep 20
 
 "$adb" emu kill
 
-ping 127.0.0.1 -t 20
+sleep 20

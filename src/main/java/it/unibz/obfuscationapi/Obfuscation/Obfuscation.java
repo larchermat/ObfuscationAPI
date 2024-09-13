@@ -20,10 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -47,7 +44,6 @@ public class Obfuscation {
     private final ArrayList<String> dexDumps;
     private final ArrayList<Transformation> transformations;
     private final String appName;
-    private String mainActivity;
     public final ArrayList<String> avds = new ArrayList<>();
     public final HashMap<String, Boolean> avdsByAvailability = new HashMap<>();
     public final HashMap<Integer, Boolean> portsByAvailability = new HashMap<>();
@@ -55,6 +51,8 @@ public class Obfuscation {
     private final ArrayList<EventType> eventTypes = new ArrayList<>();
     private boolean transform;
     private final String family;
+    private Integer threadsUsingDevice = 0;
+    private CountDownLatch latch = new CountDownLatch(0);
 
     public Obfuscation(String pathToApk, int numAvds, String avdName, int logsPerCase, ArrayList<EventType> eventTypes,
                        boolean transform, String family) throws IOException, InterruptedException {
@@ -124,15 +122,33 @@ public class Obfuscation {
         do {
             cond = tasks.stream().allMatch(Future::isDone);
         } while (!cond);
-
+        for (Future<?> task : tasks) {
+            if (task.isCancelled()) {
+                String avd = avds.get(tasks.indexOf(task));
+                avds.remove(avd);
+                avdsByAvailability.remove(avd);
+            }
+        }
         if (transform) {
             tasks = new ArrayList<>();
+
             for (Transformation t : transformations) {
                 tasks.add(executorService.submit(() -> applyTransformation(t)));
             }
             do {
                 cond = tasks.stream().allMatch(Future::isDone);
             } while (!cond);
+
+            for (Future<?> task : tasks) {
+                if (task.isCancelled()) {
+                    Transformation transformation = transformations.get(tasks.indexOf(task));
+                    transformations.remove(transformation);
+                }
+            }
+
+            if (transformations.isEmpty()) {
+                throw new RuntimeException("No transformations succeeded");
+            }
 
             for (int i = 0; i < avds.size(); i++) {
                 executorService.submit(this::executeRuns);
@@ -147,6 +163,10 @@ public class Obfuscation {
             });
             while (!task.isDone()) {
             }
+
+            if (task.isCancelled())
+                throw new RuntimeException("Could not build " + appName + " apk");
+
             for (int i = 0; i < avds.size(); i++) {
                 executorService.submit(this::executeVanillaRuns);
             }
@@ -357,12 +377,8 @@ public class Obfuscation {
     synchronized public void applyTransformation(Transformation transformation) {
         try {
             transformation.obfuscate();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        try {
             buildAPK(transformation.getClass().getSimpleName());
-        } catch (IOException | InterruptedException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -376,22 +392,17 @@ public class Obfuscation {
      * sent an activity event
      */
     public void runApk(String AE, String transformation, int logNumber, Path pathToLogs, String avd, int port) throws IOException, InterruptedException {
-        String pkg;
-        String mainActivity;
-        if (transformation.equals("IdentifierRenaming")) {
-            IdentifierRenaming idRenaming = (IdentifierRenaming) transformations.stream()
-                    .filter(t -> t instanceof IdentifierRenaming).findFirst().get();
-            pkg = idRenaming.modifiedPkgName;
-            mainActivity = "/." + idRenaming.newMainClassName;
-        } else {
-            pkg = this.pkg;
-            mainActivity = this.mainActivity;
-        }
         String pathToApk = appName + SEPARATOR + "dist" + SEPARATOR + transformation + SEPARATOR + appName;
-        //installAPK(pathToApk, avd, port);
         String pathToLogFile = pathToLogs.resolve("log" + logNumber + ".txt").toAbsolutePath().toString();
+        latch.await();
+        synchronized (threadsUsingDevice) {
+            threadsUsingDevice++;
+        }
         together(pathToApk, avd, pathToLogFile, port, AE);
-        //generateLog(pathToApk, pathToLogFile, port, AE);
+        synchronized (threadsUsingDevice) {
+            if (threadsUsingDevice > 0)
+                threadsUsingDevice--;
+        }
     }
 
     /**
@@ -448,12 +459,6 @@ public class Obfuscation {
             pkg = (matcher.group(2) + matcher.group(3)).replace(".", "/");
         else
             throw new RuntimeException("Could not find package in AndroidManifest.xml");
-        pattern = Pattern.compile("<activity.*?android:name=\"(?:" + pkg.replace("/", "\\.") + ")?(.*?)\"");
-        matcher = pattern.matcher(sb.toString());
-        if (matcher.find()) {
-            mainActivity = "/" + (matcher.group(1).startsWith(".") ? matcher.group(1) : "." + matcher.group(1));
-        } else
-            throw new RuntimeException("Could not find main activity in AndroidManifest.xml");
     }
 
 
@@ -620,7 +625,12 @@ public class Obfuscation {
                     int port = findAvailablePort();
                     try {
                         runApk(EventCommandFactory.getCommand(eventType).getCommand(), transformation, i, pathToLogs, avd, port);
-                    } catch (IOException | InterruptedException e) {
+                    } catch (Exception e) {
+                        synchronized (threadsUsingDevice) {
+                            if (threadsUsingDevice > 0)
+                                threadsUsingDevice--;
+                        }
+                        terminateEmu();
                         e.printStackTrace();
                         exceptionCount++;
                         if (exceptionCount >= 10) {
@@ -628,6 +638,8 @@ public class Obfuscation {
                             break;
                         }
                     } finally {
+                        if (latch.getCount() > 0)
+                            latch.countDown();
                         synchronized (avdsByAvailability) {
                             avdsByAvailability.put(avd, Boolean.TRUE);
                         }
@@ -638,6 +650,27 @@ public class Obfuscation {
                 }
             }
         }
+    }
+
+    private void terminateEmu() {
+        latch = new CountDownLatch(1);
+        try {
+            wait(100);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        while (true) {
+            synchronized (threadsUsingDevice) {
+                if (threadsUsingDevice == 0)
+                    break;
+            }
+        }
+        try {
+            shutdownEmus();
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        latch.countDown();
     }
 
     /**
@@ -662,7 +695,12 @@ public class Obfuscation {
                 int port = findAvailablePort();
                 try {
                     runApk(EventCommandFactory.getCommand(eventType).getCommand(), "unmodified", i, pathToLogs, avd, port);
-                } catch (IOException | InterruptedException e) {
+                } catch (Exception e) {
+                    synchronized (threadsUsingDevice) {
+                        if (threadsUsingDevice > 0)
+                            threadsUsingDevice--;
+                    }
+                    terminateEmu();
                     e.printStackTrace();
                     exceptionCount++;
                     if (exceptionCount >= 10) {

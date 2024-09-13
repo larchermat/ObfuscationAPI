@@ -325,7 +325,7 @@ public class CommandExecution {
      * @param methodName name of the method that executed the script
      * @throws RuntimeException in case the return code is different from 0
      */
-    private static void reportError(String errorLog, int retCode, String command, String methodName) throws IOException {
+    private static void reportError(String errorLog, int retCode, String command, String methodName) throws RuntimeException {
         if (!errorLog.isBlank()) {
             StringBuilder args = new StringBuilder();
             args.append("Thread: ").append(currentThread()).append(LS)
@@ -334,7 +334,12 @@ public class CommandExecution {
                     .append("Command: ").append(command).append(LS)
                     .append("Return: ").append(retCode).append(LS)
                     .append("Error: ").append(LS).append(errorLog).append(LS);
-            writeErrorLog(args);
+            try {
+                writeErrorLog(args);
+            } catch (IOException e) {
+                System.out.println("Could not write error log for " + methodName);
+                e.printStackTrace();
+            }
         }
         if (retCode != 0) {
             throw new RuntimeException(os + " command \"" + command + "\" failed");

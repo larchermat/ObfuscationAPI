@@ -15,6 +15,6 @@ fi
 i=1
 
 while [ $2 -ge $i ];do
-  echo no | "$avdmanager" create avd -n "$1_$i" -k "$3" -f -p ~/.android/avd/
+  echo no | "$avdmanager" create avd -n "$1_$i" -k "$3" -f
   i=$((i + 1))
 done

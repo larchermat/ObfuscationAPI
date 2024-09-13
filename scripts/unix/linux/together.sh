@@ -15,7 +15,15 @@ d="$2"
 
 adb=~/Android/Sdk/platform-tools/adb
 
-~/Android/Sdk/emulator/emulator @"$d" -no-snapshot-save -port "$4" > /dev/null 2>&1 &
+result=$("$adb" get-state 2>/dev/null)
+
+if [ -n "$result" ]; then
+  echo "Device was still turned on" >&2
+  "$adb" emu kill
+  sleep 5
+fi
+
+~/Android/Sdk/emulator/emulator @"$d" -no-snapshot-save -port "$4" -no-window > /dev/null 2>&1 &
 
 pattern="^1"
 
@@ -44,17 +52,17 @@ done
 
 "$adb" root
 
-ping 127.0.0.1 -t 3
+sleep 3
 
-"$adb" install -g "$a"
+"$adb" install -g "$a" || exit 1
 
-ping 127.0.0.1 -t 3
+sleep 3
 
 aapt=~/Android/Sdk/build-tools/34.0.0/aapt
 
 p=$("$aapt" dump badging "$a" | grep "package: name=" | sed 's/package: name=//g' | sed 's/ versionCode.*//g' | sed "s/\'//g")
 
-"$adb" shell monkey --pct-syskeys 0 -p "$p" -c android.intent.category.LAUNCHER 1
+"$adb" shell monkey --pct-syskeys 0 -p "$p" -c android.intent.category.LAUNCHER 1 || exit 1
 
 tmr=0
 
@@ -83,7 +91,7 @@ if [ -n "$5" ]; then
   "$adb" shell "$5"
 fi
 
-ping 127.0.0.1 -t 5
+sleep 6
 
 "$adb" shell am force-stop "$p"
 
@@ -91,4 +99,4 @@ ping 127.0.0.1 -t 5
 
 "$adb" emu kill
 
-ping 127.0.0.1 -t 5
+sleep 5
