@@ -21,7 +21,7 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
 public class LogParser {
     private static final int numLogsPerTest = 100;
     private static final HashMap<String, Integer> callsByNumberOfParams = new HashMap<>();
-    private static final int nThreads = 16;
+    private static final int nThreads = 8;
     private static final ExecutorService executorService = Executors.newFixedThreadPool(nThreads);
 
     /**
@@ -479,6 +479,7 @@ public class LogParser {
             Date date = new Date(timestamp);
             String timeString = dateFormat.format(date).replace(" ", "T") + "+02:00";
             StringBuilder args = new StringBuilder();
+            StringBuilder rets = new StringBuilder();
             for (String call : callsByNumberOfParams.keySet()) {
                 if (type.equals("error"))
                     continue;
@@ -493,18 +494,22 @@ public class LogParser {
                         args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(arguments.size() + i + 1).append("_").append(call)
                                 .append("\" value=\"NULL\"/>").append(LS);
                     }
+                    rets.append(TAB + TAB + TAB + "<string key=\"return_").append(call).append("\" value=\"")
+                            .append(ret).append("\"/>").append(LS);
                 } else {
                     for (int i = 0; i < callsByNumberOfParams.get(call); i++) {
                         args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(i + 1).append("_").append(call)
                                 .append("\" value=\"NULL\"/>").append(LS);
                     }
+                    rets.append(TAB + TAB + TAB + "<string key=\"return_").append(call)
+                            .append("\" value=\"NULL\"/>").append(LS);
                 }
             }
             if (type.equals("call")) {
                 return "" + TAB + TAB + TAB + "<string key=\"concept:name\" value=\"" + call + "\"/>" + LS +
                         args +
-                        TAB + TAB + TAB + "<date key=\"time:timestamp\" value=\"" + timeString + "\"/>" + LS;
-                        //TAB + TAB + TAB + "<string key=\"return_" + call + "\" value=\"" + ret + "\"/>" + LS;
+                        TAB + TAB + TAB + "<date key=\"time:timestamp\" value=\"" + timeString + "\"/>" + LS +
+                        rets;
             } else {
                 return ""; //+ TAB + TAB + TAB + "<string key=\"concept:name\" value=\"" + error + "\"/>" + LS +
                 //args;
