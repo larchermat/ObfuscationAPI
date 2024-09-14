@@ -19,6 +19,7 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
  * Class that performs the parsing of the log.txt files generating the trace.xes files
  */
 public class LogParser {
+    private static int nAttributes;
     private static final int numLogsPerTest = 100;
     private static final HashMap<String, Integer> callsByNumberOfParams = new HashMap<>();
     private static final int nThreads = 8;
@@ -288,6 +289,7 @@ public class LogParser {
         do {
             cond = tasks.stream().allMatch(Future::isDone);
         } while (!cond);
+        nAttributes = callsByNumberOfParams.values().stream().max(Integer::compareTo).get();
     }
 
     private static void parseLogCalls(ArrayList<String> logs) {
@@ -480,31 +482,26 @@ public class LogParser {
             String timeString = dateFormat.format(date).replace(" ", "T") + "+02:00";
             StringBuilder args = new StringBuilder();
             StringBuilder rets = new StringBuilder();
-            for (String call : callsByNumberOfParams.keySet()) {
-                if (type.equals("error"))
-                    continue;
-                if (this.call.equals(call)) {
-                    for (int i = 0; i < arguments.size(); i++) {
-                        String argument = arguments.get(i);
-                        args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(i + 1).append("_").append(call)
-                                .append("\" value=\"").append(argument)
-                                .append("\"/>").append(LS);
-                    }
-                    for (int i = 0; i < (callsByNumberOfParams.get(call) - arguments.size()); i++) {
-                        args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(arguments.size() + i + 1).append("_").append(call)
-                                .append("\" value=\"NULL\"/>").append(LS);
-                    }
-                    rets.append(TAB + TAB + TAB + "<string key=\"return_").append(call).append("\" value=\"")
-                            .append(ret).append("\"/>").append(LS);
-                } else {
-                    for (int i = 0; i < callsByNumberOfParams.get(call); i++) {
-                        args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(i + 1).append("_").append(call)
-                                .append("\" value=\"NULL\"/>").append(LS);
-                    }
-                    rets.append(TAB + TAB + TAB + "<string key=\"return_").append(call)
-                            .append("\" value=\"NULL\"/>").append(LS);
-                }
+            for (int i = 0; i < arguments.size(); i++) {
+                String argument = arguments.get(i);
+                args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(i + 1)
+                        .append("\" value=\"").append(argument)
+                        .append("\"/>").append(LS);
             }
+            for (int i = 0; i < (nAttributes - arguments.size()); i++) {
+                args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(arguments.size() + i + 1)
+                        .append("\" value=\"NULL\"/>").append(LS);
+            }
+            rets.append("" + TAB + TAB + TAB + "<string key=\"return\" value=\"")
+                    .append(ret).append("\"/>").append(LS);
+            // else {
+//                    for (int i = 0; i < callsByNumberOfParams.get(call); i++) {
+//                        args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(i + 1).append("_").append(call)
+//                                .append("\" value=\"NULL\"/>").append(LS);
+//                    }
+//                    rets.append(TAB + TAB + TAB + "<string key=\"return_").append(call)
+//                            .append("\" value=\"NULL\"/>").append(LS);
+//                }
             if (type.equals("call")) {
                 return "" + TAB + TAB + TAB + "<string key=\"concept:name\" value=\"" + call + "\"/>" + LS +
                         args +
