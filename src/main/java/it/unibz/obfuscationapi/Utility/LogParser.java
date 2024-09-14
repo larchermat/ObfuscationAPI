@@ -8,6 +8,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -18,9 +19,10 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
  * Class that performs the parsing of the log.txt files generating the trace.xes files
  */
 public class LogParser {
-    private static final int numLogsPerTest = 50;
+    private static final int numLogsPerTest = 100;
     private static final HashMap<String, Integer> callsByNumberOfParams = new HashMap<>();
-    private static final ExecutorService executorService = Executors.newFixedThreadPool(8);
+    private static final int nThreads = 16;
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(nThreads);
 
     /**
      * Takes all logs, parses them into xes traces and produces three datasets with partial traces:
@@ -32,6 +34,7 @@ public class LogParser {
      */
     public static void generateDatasets() {
         initializeCallsMap();
+        calcAverageEventNum();
         long averageEventNum = 100;
         int[] eventsForDataset = {
                 (int) Math.round(averageEventNum * 0.3),
@@ -192,8 +195,7 @@ public class LogParser {
         OutputStreamWriter osw;
         FileOutputStream fos;
         Path pathToDataset = pathToDatasetDir.resolve("dataset" + (i + 1) + ".xes");
-        if (pathToDataset.toString().contains("training/dataset1.xes"))
-            System.out.println("How many genders are there?");
+        System.out.println("Thread " + Thread.currentThread() + " started");
         try {
             Files.deleteIfExists(pathToDataset);
             Files.createFile(pathToDataset);
@@ -208,8 +210,8 @@ public class LogParser {
         boolean success = generateTrace(logs, numEvents, osw, limit);
         try {
             osw.append("</log>").append(LS);
-            if (pathToDataset.toString().contains("training/dataset1.xes"))
-                System.out.println("I don't know I just got here");
+            osw.flush();
+            System.out.println("Thread " + Thread.currentThread() + " finished");
             osw.close();
             fos.close();
         } catch (IOException e) {
@@ -250,7 +252,7 @@ public class LogParser {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            if (eventNum < 13) {
+            if (eventNum <= 70) {
                 logsToDelete.add(Paths.get(log));
                 continue;
             }
@@ -275,12 +277,17 @@ public class LogParser {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        int size = logs.size() / 8;
-        for (int i = 0; i < 8; i++) {
+        ArrayList<Future<?>> tasks = new ArrayList<>();
+        int size = logs.size() / nThreads;
+        for (int i = 0; i < nThreads; i++) {
             int start = i * size;
-            int end = i == 7 ? logs.size() : (i + 1) * size;
-            executorService.submit(() -> parseLogCalls(new ArrayList<>(logs.subList(start, end))));
+            int end = i == (nThreads - 1) ? logs.size() : (i + 1) * size;
+            tasks.add(executorService.submit(() -> parseLogCalls(new ArrayList<>(logs.subList(start, end)))));
         }
+        boolean cond;
+        do {
+            cond = tasks.stream().allMatch(Future::isDone);
+        } while (!cond);
     }
 
     private static void parseLogCalls(ArrayList<String> logs) {
@@ -377,7 +384,7 @@ public class LogParser {
                 sb.append(TAB).append(TAB).append("<event>").append(LS);
                 sb.append(event.getEvent());
                 sb.append(TAB).append(TAB).append("</event>").append(LS).append(LS);
-                if (sb.length() > 2097152) {
+                if (sb.length() > 524288) {
                     try {
                         osw.append(sb.toString());
                         osw.flush();
