@@ -176,6 +176,7 @@ public class CallIndirection implements Transformation {
 
     /**
      * Counts how many registers are used in the invocation
+     *
      * @param registers string containing all registers used in the invocation
      * @return the number of registers used in the invocation
      */
@@ -210,10 +211,11 @@ public class CallIndirection implements Transformation {
     /**
      * Checks that the registers initialized for that method invocation do not contain any of the private volatile
      * fields
+     *
      * @param trimmedClassBody body of the class trimmed not to include further invocations that may include a new
      *                         assignment of the registers
-     * @param methodRegisters registers passed as arguments in the invocation, that need to be checked
-     * @param fields list of private volatile fields of the current class
+     * @param methodRegisters  registers passed as arguments in the invocation, that need to be checked
+     * @param fields           list of private volatile fields of the current class
      * @return true if at least one register contains the value of one of the private volatile fields at the moment of
      * invocation, false otherwise
      */

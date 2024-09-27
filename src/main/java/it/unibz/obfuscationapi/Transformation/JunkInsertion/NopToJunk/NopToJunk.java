@@ -48,6 +48,7 @@ public class NopToJunk implements Transformation {
 
     /**
      * Loads all junk instructions from the junk_instr.txt file
+     *
      * @return the arraylist containing all junk instructions
      */
     private ArrayList<ArrayList<String>> loadJunkInstr() throws FileNotFoundException {

@@ -15,7 +15,7 @@ import java.util.HashMap;
  * passed
  */
 public class EventCommandFactory {
-    public static final HashMap<EventType, EventCommand> commandMap = new HashMap<>();
+    private static final HashMap<EventType, EventCommand> commandMap = new HashMap<>();
 
     static {
         commandMap.put(EventType.BOOT_COMPLETED, new BootCompleted());
@@ -36,7 +36,7 @@ public class EventCommandFactory {
         commandMap.put(EventType.RECEIVING_CALL, new CallEvent());
     }
 
-    public static EventCommand getCommand(EventType type) {
+    public static EventCommand getEventCommand(EventType type) {
         return commandMap.get(type);
     }
 }

@@ -5,11 +5,13 @@ import it.unibz.obfuscationapi.Events.EventCommand;
 public class NetEvent implements EventCommand {
     private final Service service;
     private final State state;
+
     public enum Service {
         wifi,
         data,
         bluetooth
     }
+
     public enum State {
         enable,
         disable

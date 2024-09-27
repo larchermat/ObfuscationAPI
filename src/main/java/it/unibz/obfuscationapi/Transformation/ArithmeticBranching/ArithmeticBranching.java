@@ -45,7 +45,7 @@ public class ArithmeticBranching implements Transformation {
      *      instructions
      *      return
      * </pre> </blockquote>
-     *
+     * <p>
      * Becomes
      *
      * <blockquote> <pre>
@@ -93,8 +93,8 @@ public class ArithmeticBranching implements Transformation {
                 int v0 = randInt(1, 32);
                 int v1 = randInt(1, 32);
                 String temp = matcher1.group(1) + LS + LS +
-                        TAB + "const v0, " + String.format("0x%01X",v0) + LS + LS +
-                        TAB + "const v1, " + String.format("0x%01X",v1) + LS + LS +
+                        TAB + "const v0, " + String.format("0x%01X", v0) + LS + LS +
+                        TAB + "const v1, " + String.format("0x%01X", v1) + LS + LS +
                         TAB + "add-int v0, v0, v1" + LS + LS +
                         TAB + "rem-int v0, v0, v1" + LS + LS +
                         TAB + "if-gtz v0, :" + tempLabel + LS + LS +

@@ -7,7 +7,7 @@ public class BatteryLevel implements EventCommand {
     private final int lvl;
 
     public BatteryLevel(EventType battLvl) {
-        this.lvl = switch(battLvl) {
+        this.lvl = switch (battLvl) {
             case BATT_FULL -> 100;
             case BATT_HALF -> 50;
             case BATT_LOW -> 19;

@@ -224,4 +224,13 @@ public class Utilities {
         osw.close();
         fos.close();
     }
+
+    private static void deleteDir(File dir) {
+        File[] files = dir.listFiles();
+        if (files != null)
+            for (File file : files) {
+                if (file.isDirectory()) deleteDir(file);
+                else file.delete();
+            }
+    }
 }

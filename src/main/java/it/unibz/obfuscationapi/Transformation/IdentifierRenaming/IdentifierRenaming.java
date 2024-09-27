@@ -5,8 +5,8 @@ import it.unibz.obfuscationapi.Transformation.Transformation;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,8 +28,7 @@ public class IdentifierRenaming implements Transformation {
     public String newMainClassName;
 
     /**
-     *
-     * @param path path to the project's directory
+     * @param path         path to the project's directory
      * @param manifestPath path to the manifest of the project; can be an absolute path or the relative path from the
      *                     project directory
      */
@@ -45,11 +44,10 @@ public class IdentifierRenaming implements Transformation {
     }
 
     /**
-     *
-     * @param path path to the project's directory
+     * @param path         path to the project's directory
      * @param manifestPath path to the manifest of the project; can be an absolute path or the relative path from the
      *                     project directory
-     * @param operation operation to perform on the files, either "renamePackage", "renameClass" or "all" for both
+     * @param operation    operation to perform on the files, either "renamePackage", "renameClass" or "all" for both
      */
     public IdentifierRenaming(String path, String manifestPath, String operation) {
         this.path = path;
@@ -69,6 +67,7 @@ public class IdentifierRenaming implements Transformation {
 
     /**
      * Applies the selected transformation to the project
+     *
      * @throws IOException
      */
     @Override
@@ -155,6 +154,7 @@ public class IdentifierRenaming implements Transformation {
 
     /**
      * Sets the {@link IdentifierRenaming#packageIdentifier packageIdentifier} using / as a separator
+     *
      * @param sb string buffer of the manifest file from which we extract the package name
      */
     private void setPackageIdentifier(StringBuffer sb) {
@@ -166,9 +166,10 @@ public class IdentifierRenaming implements Transformation {
 
     /**
      * Changes the occurrences of the package inside a xml file with the new name package name
-     * @param sb string buffer with the content of the xml file to modify
+     *
+     * @param sb              string buffer with the content of the xml file to modify
      * @param manifestPackage name of the package
-     * @param newPkgName new name of the package
+     * @param newPkgName      new name of the package
      * @return the modified string buffer
      */
     private StringBuffer changeXmlPackageName(StringBuffer sb, String manifestPackage, String newPkgName) {
@@ -192,7 +193,8 @@ public class IdentifierRenaming implements Transformation {
 
     /**
      * Changes the name of the package in a file
-     * @param sb string buffer with the content of the file we are modifying
+     *
+     * @param sb         string buffer with the content of the file we are modifying
      * @param newPkgName new name of the package
      * @return the modified string buffer
      */
@@ -208,8 +210,7 @@ public class IdentifierRenaming implements Transformation {
             if ((matcher.group(1) + matcher.group(2)).contains(packageIdentifier) && (matcher.group(5) != null && (matcher.group(5) + matcher.group(6)).contains(packageIdentifier))) {
                 String replacement = matcher.group(1) + newPkgName + matcher.group(3) + matcher.group(5) + newPkgName + matcher.group(7);
                 matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
-            }
-            else if ((matcher.group(1) + matcher.group(2)).contains(packageIdentifier)) {
+            } else if ((matcher.group(1) + matcher.group(2)).contains(packageIdentifier)) {
                 String replacement = matcher.group(1) + newPkgName + matcher.group(3) + (matcher.group(5) != null ? matcher.group(5) + matcher.group(6) + matcher.group(7) : "");
                 matcher.appendReplacement(nFile, Matcher.quoteReplacement(replacement));
             }
@@ -223,7 +224,8 @@ public class IdentifierRenaming implements Transformation {
     /**
      * Changes the name of the classes in a file according to the entries in the {@link IdentifierRenaming#classes classes}
      * hashMap
-     * @param sb string buffer with the content of the file in which we look for the classes to change
+     *
+     * @param sb   string buffer with the content of the file in which we look for the classes to change
      * @param file the file we are operating on
      * @return the modified string buffer
      */
@@ -275,8 +277,7 @@ public class IdentifierRenaming implements Transformation {
             if (matcher.group(2) != null && classes.containsKey(matcher.group(2) + "." + matcher.group(3))) {
                 matcher.appendReplacement(nFile, matcher.group(1) + classes.get(matcher.group(2) + "." + matcher.group(3)) + matcher.group(4));
                 newMainClassName = classes.get(matcher.group(2) + "." + matcher.group(3));
-            }
-            else if (classes.containsKey(packageIdentifier + "/" + matcher.group(3))) {
+            } else if (classes.containsKey(packageIdentifier + "/" + matcher.group(3))) {
                 matcher.appendReplacement(nFile, matcher.group(1) + classes.get(packageIdentifier + "/" + matcher.group(3)) + matcher.group(4));
                 newMainClassName = classes.get(packageIdentifier + "/" + matcher.group(3));
             }
@@ -288,7 +289,8 @@ public class IdentifierRenaming implements Transformation {
     /**
      * Adds all files with a particular extension under a parent directory in the fileList ArrayList only if the path
      * contains either one of the dirsToInclude and does not contain any of the dirsToExclude
-     * @param pathFile path of the parent directory
+     *
+     * @param pathFile  path of the parent directory
      * @param extension extension to look for
      */
     private void addFiles(File pathFile, String extension) {

@@ -5,7 +5,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -19,14 +22,37 @@ import static it.unibz.obfuscationapi.Utility.Utilities.*;
  * Class that performs the parsing of the log.txt files generating the trace.xes files
  */
 public class LogParser {
-    private static int nAttributes;
-    private static final int numLogsPerTest = 100;
-    private static final HashMap<String, Integer> callsByNumberOfParams = new HashMap<>();
-    private static final int nThreads = 8;
+    private static int numLogsPerTest = 100;
+    private static final HashMap<String, ArrayList<Boolean>> callsByNumberOfParams30 = new HashMap<>();
+    private static final HashMap<String, ArrayList<Boolean>> callsByNumberOfParams50 = new HashMap<>();
+    private static final HashMap<String, ArrayList<Boolean>> callsByNumberOfParams70 = new HashMap<>();
+    private static int nThreads = 8;
     private static final ExecutorService executorService = Executors.newFixedThreadPool(nThreads);
+    private static final ArrayList<Future<?>> tasks = new ArrayList<>();
+    private static boolean attributes = false;
+    private static boolean average = false;
+    private static int[] eventsForDataset;
+
+    public static void setAttributes(boolean attributes) {
+        LogParser.attributes = attributes;
+    }
+
+    public static void setAverage(boolean average) {
+        LogParser.average = average;
+    }
+
+    public static void setnThreads(int nThreads) {
+        LogParser.nThreads = nThreads;
+    }
+
+    public static void setNumLogsPerTest(int numLogsPerTest) {
+        LogParser.numLogsPerTest = numLogsPerTest;
+    }
 
     /**
-     * Takes all logs, parses them into xes traces and produces three datasets with partial traces:
+     * Parses files contained in the logs folder to generate three types of training and testing datasets with different
+     * trace lengths: if average is true, it uses of the average number of events, otherwise it uses the fixed number of
+     * 100. The three datasets will be:
      * <ul>
      *     <li>one dataset whose traces contain 30% of the average number of events</li>
      *     <li>one dataset whose traces contain 50% of the average number of events</li>
@@ -34,17 +60,28 @@ public class LogParser {
      * </ul>
      */
     public static void generateDatasets() {
-        initializeCallsMap();
-        calcAverageEventNum();
         long averageEventNum = 100;
-        int[] eventsForDataset = {
+        if (average) {
+            averageEventNum = calcAverageEventNum();
+        }
+        eventsForDataset = new int[]{
                 (int) Math.round(averageEventNum * 0.3),
                 (int) Math.round(averageEventNum * 0.5),
                 (int) Math.round(averageEventNum * 0.7),
         };
-        generateTracesTraining(eventsForDataset);
-        //generateTracesTesting(eventsForDataset);
-        generateTracesTestingPerCategory(eventsForDataset);
+        if (attributes) {
+            initializeCallsMap();
+        }
+        generateTracesTraining();
+        generateTracesTestingPerCategory();
+        boolean cond;
+        do {
+            cond = tasks.stream().allMatch(Future::isDone);
+        } while (!cond);
+        if (tasks.stream().anyMatch(Future::isCancelled)) {
+            System.out.println("Not every thread concluded");
+            throw new RuntimeException();
+        }
         executorService.shutdown();
         try {
             if (!executorService.awaitTermination(600, TimeUnit.SECONDS)) {
@@ -56,11 +93,9 @@ public class LogParser {
     }
 
     /**
-     * Generates all traces for a given dataset
-     *
-     * @param eventsForDataset number of events each trace must include
+     * Generates the training datasets, given the number of events that the traces of each dataset will contain
      */
-    private static void generateTracesTraining(int[] eventsForDataset) {
+    private static void generateTracesTraining() {
         Path pathToDatasetDir = Paths.get("traces", "training");
         if (!pathToDatasetDir.toFile().exists()) {
             try {
@@ -82,43 +117,15 @@ public class LogParser {
         }
         for (int i = 0; i < eventsForDataset.length; i++) {
             int finalI = i;
-            executorService.submit(() -> generateDataset(eventsForDataset[finalI], pathToDatasetDir, finalI, logs, 0));
+            tasks.add(executorService.submit(() -> generateDataset(eventsForDataset[finalI], pathToDatasetDir, finalI, logs, 0)));
         }
     }
 
-    private static void generateTrainSet(Path pathToDatasetDir, int i, ArrayList<String> logs, int numEvents) {
-        OutputStreamWriter osw;
-        FileOutputStream fos;
-        Path pathToDataset = pathToDatasetDir.resolve("dataset" + (i + 1) + ".xes");
-        try {
-            fos = new FileOutputStream(pathToDataset.toString());
-            osw = new OutputStreamWriter(fos);
-            osw.append("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>").append(LS)
-                    .append("<log xmlns=\"http://www.xes-standard.org/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ")
-                    .append("xsi:schemaLocation=\"http://www.xes-standard.org/ XES.xsd\" version=\"1.0\">").append(LS);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        generateTrace(logs, numEvents, osw, 0);
-        try {
-            osw.append("</log>").append(LS);
-            osw.close();
-            fos.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private static void deleteDir(File apkDir) {
-        File[] files = apkDir.listFiles();
-        if (files != null)
-            for (File file : files) {
-                if (file.isDirectory()) deleteDir(file);
-                else file.delete();
-            }
-    }
-
-    private static void generateTracesTestingPerCategory(int[] numEvents) {
+    /**
+     * Generates the testing datasets for each transformation technique, given the number of events that the traces of
+     * each dataset will contain
+     */
+    private static void generateTracesTestingPerCategory() {
         String[] categories = {"unmodified", "AdvancedReflection", "ArithmeticBranching", "CallIndirection",
                 "CodeReorder", "IdentifierRenaming", "Insertion", "NopToJunk", "StringEncryption"};
         Path pathToLog = Paths.get("logs");
@@ -146,52 +153,23 @@ public class LogParser {
                 if (!apkDir.isDirectory()) continue;
                 categoryLogs.addAll(logs.stream().filter(log -> log.contains(category) && log.contains(apkDir.getName())).limit(numLogsPerTest).toList());
             }
-            for (int i = 0; i < numEvents.length; i++) {
+            for (int i = 0; i < eventsForDataset.length; i++) {
                 int finalI = i;
-                executorService.submit(() -> generateDataset(numEvents[finalI], categoryDir, finalI, categoryLogs, 0));
+                tasks.add(executorService.submit(() -> generateDataset(eventsForDataset[finalI], categoryDir, finalI, categoryLogs, 0)));
             }
         }
     }
 
-    private static void generateTracesTesting(int[] numEvents) {
-        Path pathToLog = Paths.get("logs");
-        File logsDir = pathToLog.toFile();
-        File[] apkDirs = logsDir.listFiles();
-        assert apkDirs != null;
-        for (File apkDir : apkDirs) {
-            if (!apkDir.isDirectory()) continue;
-            File[] obfDirs = apkDir.listFiles();
-            if (obfDirs == null) continue;
-            for (File obfDir : obfDirs) {
-                File[] eventDirs = obfDir.listFiles();
-                if (eventDirs == null) continue;
-                String obfDirPath = obfDir.getAbsolutePath();
-                Path pathToDatasetDir = Paths.get(obfDirPath.replace("logs", "traces"));
-                if (!pathToDatasetDir.toFile().exists()) {
-                    try {
-                        Files.createDirectories(pathToDatasetDir);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                for (int i = 0; i < numEvents.length; i++) {
-                    ArrayList<String> logs;
-                    try {
-                        logs = navigateDirectoryContents(obfDir.getPath(), null);
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                    if (logs.isEmpty()) {
-                        deleteDir(obfDir);
-                        break;
-                    }
-                    int finalI = i;
-                    executorService.submit(() -> generateDataset(numEvents[finalI], pathToDatasetDir, finalI, logs, numLogsPerTest));
-                }
-            }
-        }
-    }
-
+    /**
+     * Parses the files provided generating the dataset file specified
+     *
+     * @param numEvents        length of the traces for the current dataset
+     * @param pathToDatasetDir path to the dataset file to create
+     * @param i                number of the current dataset; the naming purpose is to distinguish between dataset of different length
+     *                         in the same folder
+     * @param logs             list of paths to the logs to parse
+     * @param limit            limit of logs to parse, if 0 there is no limit
+     */
     private static void generateDataset(int numEvents, Path pathToDatasetDir, int i, ArrayList<String> logs, int limit) {
         OutputStreamWriter osw;
         FileOutputStream fos;
@@ -253,6 +231,9 @@ public class LogParser {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+            // For the current evaluation, 70 is the highest trace length, so, to keep the relative frequency of every
+            // malware as constant as possible throughout the three different datasets, we delete every log that is
+            // under 70 events long
             if (eventNum <= 70) {
                 logsToDelete.add(Paths.get(log));
                 continue;
@@ -270,6 +251,9 @@ public class LogParser {
         return Math.round(eventNums.stream().mapToInt(Integer::intValue).average().orElse(0.0));
     }
 
+    /**
+     * Initializes the three maps that link calls to attributes
+     */
     private static void initializeCallsMap() {
         Path path = Paths.get("logs");
         ArrayList<String> logs;
@@ -289,9 +273,15 @@ public class LogParser {
         do {
             cond = tasks.stream().allMatch(Future::isDone);
         } while (!cond);
-        nAttributes = callsByNumberOfParams.values().stream().max(Integer::compareTo).get();
+        if (tasks.stream().anyMatch(Future::isCancelled)) {
+            System.out.println("Not every thread concluded");
+            throw new RuntimeException();
+        }
     }
 
+    /**
+     * For each log it extracts the events and calls the update of the callsByNumberOfParams maps, for each trace length
+     */
     private static void parseLogCalls(ArrayList<String> logs) {
         ArrayList<Event> events = new ArrayList<>();
         for (String log : logs) {
@@ -304,37 +294,57 @@ public class LogParser {
             Pattern pattern = Pattern.compile("(?:\\s+([0-9]+\\.[0-9]+) )?" +
                     "(([a-zA-Z_0-9]+)\\((.*?)\\)\\s+= (.*?)(?: <([0-9]+\\.[0-9]+)>)?)");
             Matcher matcher = pattern.matcher(content.toString());
-            while (matcher.find()) {
+            int parsedEvents = 0;
+            while (matcher.find() && parsedEvents <= 70) {
                 Event event = new Event(matcher, 0);
                 if (event.type.equals("error"))
                     continue;
                 events.add(event);
+                parsedEvents++;
             }
+
+            updateCallsByParamNum(eventsForDataset[0], events, callsByNumberOfParams30);
+            updateCallsByParamNum(eventsForDataset[1], events, callsByNumberOfParams50);
+            updateCallsByParamNum(eventsForDataset[2], events, callsByNumberOfParams70);
             content.delete(0, content.length());
-            if (events.size() > 100) {
-                for (Event event : events) {
-                    synchronized (callsByNumberOfParams) {
-                        if (callsByNumberOfParams.containsKey(event.call)) {
-                            if (event.arguments.size() > callsByNumberOfParams.get(event.call)) {
-                                callsByNumberOfParams.replace(event.call, event.arguments.size());
-                            }
+            events.clear();
+        }
+    }
+
+    /**
+     * For every event parsed (not exceeding the number of events per trace) it inserts or updates the call in the map,
+     * linking the name of the call to the number of parameters represented as a boolean list, where the true value
+     * means that the parameter is int, and if false it is string. If a call already exists in the map, then the version
+     * with the highest number of events is kept, and also if the same parameter appears as string and int in different
+     * logs, the selected type is string, to keep the type consistent throughout all traces
+     *
+     * @param nEvent                number of events for the trace
+     * @param events                list containing the parsed events
+     * @param callsByNumberOfParams map to update
+     */
+    private static void updateCallsByParamNum(int nEvent, ArrayList<Event> events, HashMap<String, ArrayList<Boolean>> callsByNumberOfParams) {
+        if (!events.isEmpty() && events.size() >= nEvent) {
+            for (int i = 0; i < nEvent && i < events.size(); i++) {
+                Event event = events.get(i);
+                ArrayList<Boolean> paramTypes = new ArrayList<>();
+                for (String arg : event.arguments) {
+                    try {
+                        Integer.parseInt(arg);
+                        paramTypes.add(Boolean.TRUE);
+                    } catch (NumberFormatException e) {
+                        paramTypes.add(Boolean.FALSE);
+                    }
+                }
+                if (callsByNumberOfParams.containsKey(event.call)) {
+                    for (int j = 0; j < callsByNumberOfParams.get(event.call).size(); j++) {
+                        if (paramTypes.size() > j) {
+                            paramTypes.set(j, paramTypes.get(j) && callsByNumberOfParams.get(event.call).get(j));
                         } else {
-                            callsByNumberOfParams.put(event.call, event.arguments.size());
+                            paramTypes.add(callsByNumberOfParams.get(event.call).get(j));
                         }
                     }
                 }
-            }
-            events.clear();
-        }
-        for (Event event : events) {
-            synchronized (callsByNumberOfParams) {
-                if (callsByNumberOfParams.containsKey(event.call)) {
-                    if (event.arguments.size() > callsByNumberOfParams.get(event.call)) {
-                        callsByNumberOfParams.replace(event.call, event.arguments.size());
-                    }
-                } else {
-                    callsByNumberOfParams.put(event.call, event.arguments.size());
-                }
+                callsByNumberOfParams.put(event.call, paramTypes);
             }
         }
     }
@@ -347,6 +357,7 @@ public class LogParser {
      * @param logs      list of the paths of the log.txt files
      * @param numEvents number of events for each trace
      * @param osw       output stream pointing to the dataset we are appending the traces to
+     * @param limit     limit of traces to add, if 0 there is no limit
      */
     private static boolean generateTrace(ArrayList<String> logs, int numEvents, OutputStreamWriter osw, int limit) {
         long start = System.currentTimeMillis();
@@ -361,7 +372,7 @@ public class LogParser {
             } catch (FileNotFoundException | UnsupportedEncodingException e) {
                 throw new RuntimeException(e);
             }
-            // We have two cases, either a call, or an error
+            // We have two cases, either a call, or an error, but only consider calls
             Pattern pattern = Pattern.compile("(?:\\s+([0-9]+\\.[0-9]+) )?" +
                     "(?:(([a-zA-Z_0-9]+)\\((.*?)\\)\\s+= (.*?)(?: <([0-9]+\\.[0-9]+)>)?)|" +
                     "(--- (.*?) \\{(.*?)} ---))" + LS);
@@ -384,7 +395,7 @@ public class LogParser {
             sb.append(getTraceHeader(log, (tracesAdded + 1)));
             for (Event event : events) {
                 sb.append(TAB).append(TAB).append("<event>").append(LS);
-                sb.append(event.getEvent());
+                sb.append(event.getEvent(numEvents));
                 sb.append(TAB).append(TAB).append("</event>").append(LS).append(LS);
                 if (sb.length() > 524288) {
                     try {
@@ -430,7 +441,6 @@ public class LogParser {
     private static class Event {
         String type;
         String call;
-        String error;
         ArrayList<String> arguments;
         String ret;
         long timestamp;
@@ -457,59 +467,54 @@ public class LogParser {
                 ret = sanitize(matcher.group(5));
             } else if (matcher.group(7) != null) {
                 type = "error";
-                error = sanitize(matcher.group(8));
-                Scanner scanner = new Scanner(matcher.group(9) == null ? "" : sanitize(matcher.group(9)));
-                scanner.useDelimiter(",");
-                while (scanner.hasNext()) {
-                    StringBuilder argument = new StringBuilder(scanner.next());
-                    if ((argument.toString().contains("(") && !argument.toString().contains(")")) ||
-                            (argument.toString().contains("[") && !argument.toString().contains("]")) ||
-                            (argument.toString().contains("{") && !argument.toString().contains("}"))) {
-                        while (scanner.hasNext() && !closedBrackets(argument.toString())) {
-                            argument.append(scanner.next());
-                        }
-                    }
-                    arguments.add(argument.toString().strip());
-                }
             } else {
                 throw new RuntimeException("Unknown event: " + matcher.group());
             }
         }
 
-        public String getEvent() {
+        public String getEvent(int nEvents) {
             SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS");
             Date date = new Date(timestamp);
             String timeString = dateFormat.format(date).replace(" ", "T") + "+02:00";
             StringBuilder args = new StringBuilder();
-            StringBuilder rets = new StringBuilder();
-            for (int i = 0; i < arguments.size(); i++) {
-                String argument = arguments.get(i);
-                args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(i + 1)
-                        .append("\" value=\"").append(argument)
-                        .append("\"/>").append(LS);
+            if (attributes) {
+                HashMap<String, ArrayList<Boolean>> callsByNumberOfParams = switch (nEvents) {
+                    case 30 -> callsByNumberOfParams30;
+                    case 50 -> callsByNumberOfParams50;
+                    case 70 -> callsByNumberOfParams70;
+                    default -> throw new RuntimeException("Unknown event: " + nEvents);
+                };
+                for (String call : callsByNumberOfParams.keySet()) {
+                    if (type.equals("error"))
+                        continue;
+                    if (this.call.equals(call)) {
+                        for (int i = 0; i < arguments.size(); i++) {
+                            Boolean paramType = callsByNumberOfParams.get(call).get(i);
+                            String argument = arguments.get(i);
+                            args.append("" + TAB + TAB + TAB).append("<").append(paramType ? "int" : "string").append(" key=\"param_").append(i + 1).append("_").append(call)
+                                    .append("\" value=\"").append(argument)
+                                    .append("\"/>").append(LS);
+                        }
+                        for (int i = 0; i < (callsByNumberOfParams.get(call).size() - arguments.size()); i++) {
+                            Boolean paramType = callsByNumberOfParams.get(call).get(arguments.size() + i);
+                            args.append("" + TAB + TAB + TAB).append("<").append(paramType ? "int" : "string").append(" key=\"param_").append(arguments.size() + i + 1).append("_").append(call)
+                                    .append("\" value=\"\"/>").append(LS);
+                        }
+                    } else {
+                        for (int i = 0; i < callsByNumberOfParams.get(call).size(); i++) {
+                            Boolean paramType = callsByNumberOfParams.get(call).get(i);
+                            args.append("" + TAB + TAB + TAB).append("<").append(paramType ? "int" : "string").append(" key=\"param_").append(i + 1).append("_").append(call)
+                                    .append("\" value=\"\"/>").append(LS);
+                        }
+                    }
+                }
             }
-            for (int i = 0; i < (nAttributes - arguments.size()); i++) {
-                args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(arguments.size() + i + 1)
-                        .append("\" value=\"NULL\"/>").append(LS);
-            }
-            rets.append("" + TAB + TAB + TAB + "<string key=\"return\" value=\"")
-                    .append(ret).append("\"/>").append(LS);
-            // else {
-//                    for (int i = 0; i < callsByNumberOfParams.get(call); i++) {
-//                        args.append("" + TAB + TAB + TAB).append("<string key=\"param_").append(i + 1).append("_").append(call)
-//                                .append("\" value=\"NULL\"/>").append(LS);
-//                    }
-//                    rets.append(TAB + TAB + TAB + "<string key=\"return_").append(call)
-//                            .append("\" value=\"NULL\"/>").append(LS);
-//                }
             if (type.equals("call")) {
                 return "" + TAB + TAB + TAB + "<string key=\"concept:name\" value=\"" + call + "\"/>" + LS +
                         args +
-                        TAB + TAB + TAB + "<date key=\"time:timestamp\" value=\"" + timeString + "\"/>" + LS +
-                        rets;
+                        TAB + TAB + TAB + "<date key=\"time:timestamp\" value=\"" + timeString + "\"/>" + LS;
             } else {
-                return ""; //+ TAB + TAB + TAB + "<string key=\"concept:name\" value=\"" + error + "\"/>" + LS +
-                //args;
+                return "";
             }
         }
 

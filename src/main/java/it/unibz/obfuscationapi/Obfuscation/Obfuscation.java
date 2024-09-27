@@ -44,10 +44,10 @@ public class Obfuscation {
     private final ArrayList<String> dexDumps;
     private final ArrayList<Transformation> transformations;
     private final String appName;
-    public final ArrayList<String> avds = new ArrayList<>();
-    public final HashMap<String, Boolean> avdsByAvailability = new HashMap<>();
-    public final HashMap<Integer, Boolean> portsByAvailability = new HashMap<>();
-    public final HashMap<String, Integer> logsByNumber = new HashMap<>();
+    private final ArrayList<String> avds = new ArrayList<>();
+    private final HashMap<String, Boolean> avdsByAvailability = new HashMap<>();
+    private final HashMap<Integer, Boolean> portsByAvailability = new HashMap<>();
+    private final HashMap<String, Integer> logsByNumber = new HashMap<>();
     private final ArrayList<EventType> eventTypes = new ArrayList<>();
     private boolean transform;
     private final String family;
@@ -391,14 +391,14 @@ public class Obfuscation {
      * Installs the APK on the emulated device and runs the application collecting the log of the execution after having
      * sent an activity event
      */
-    public void runApk(String AE, String transformation, int logNumber, Path pathToLogs, String avd, int port) throws IOException, InterruptedException {
+    private void runApk(String AE, String transformation, int logNumber, Path pathToLogs, String avd, int port) throws IOException, InterruptedException {
         String pathToApk = appName + SEPARATOR + "dist" + SEPARATOR + transformation + SEPARATOR + appName;
         String pathToLogFile = pathToLogs.resolve("log" + logNumber + ".txt").toAbsolutePath().toString();
         latch.await();
         synchronized (threadsUsingDevice) {
             threadsUsingDevice++;
         }
-        together(pathToApk, avd, pathToLogFile, port, AE);
+        generateLog(pathToApk, avd, pathToLogFile, port, AE);
         synchronized (threadsUsingDevice) {
             if (threadsUsingDevice > 0)
                 threadsUsingDevice--;
@@ -489,7 +489,7 @@ public class Obfuscation {
      *
      * @return HashMap containing the pairs path of dexdump and the number of methods in the files inside of it
      */
-    public HashMap<String, Integer> getSmaliDirsByMethodLimit() throws FileNotFoundException, UnsupportedEncodingException {
+    private HashMap<String, Integer> getSmaliDirsByMethodLimit() throws FileNotFoundException, UnsupportedEncodingException {
         return dexDumps.stream()
                 .collect(Collectors.toMap(
                         dir -> smaliDirs.get(dexDumps.indexOf(dir)) + SEPARATOR + pkg.replace("/", SEPARATOR),
@@ -516,7 +516,7 @@ public class Obfuscation {
      * @param dexDump string containing the path to the dex file
      * @return the number of unique methods contained in a dex file
      */
-    public int countMethodsInDex(String dexDump) throws FileNotFoundException, UnsupportedEncodingException {
+    private int countMethodsInDex(String dexDump) throws FileNotFoundException, UnsupportedEncodingException {
         HashSet<String> uniqueMethods = new HashSet<>();
         Pattern pattern = Pattern.compile("(Class #[0-9]+)(?s)(.*?)(source_file_idx.*?\\))");
         try (BufferedReader reader = new BufferedReader(new FileReader(dexDump))) {
@@ -566,7 +566,7 @@ public class Obfuscation {
      *
      * @param dexChunk StringBuilder containing the chunk of the dex file to analyze
      */
-    public void countMethodsInDexChunk(StringBuilder dexChunk, HashSet<String> uniqueMethods) throws FileNotFoundException, UnsupportedEncodingException {
+    private void countMethodsInDexChunk(StringBuilder dexChunk, HashSet<String> uniqueMethods) throws FileNotFoundException, UnsupportedEncodingException {
         Pattern pattern = Pattern.compile("(Class #[0-9]+)(?s)(.*?)(source_file_idx.*?\\))");
         Matcher matcher = pattern.matcher(dexChunk);
         while (matcher.find()) {
@@ -624,7 +624,7 @@ public class Obfuscation {
                     String avd = findAvailableDevice();
                     int port = findAvailablePort();
                     try {
-                        runApk(EventCommandFactory.getCommand(eventType).getCommand(), transformation, i, pathToLogs, avd, port);
+                        runApk(EventCommandFactory.getEventCommand(eventType).getCommand(), transformation, i, pathToLogs, avd, port);
                     } catch (Exception e) {
                         synchronized (threadsUsingDevice) {
                             if (threadsUsingDevice > 0)
@@ -694,7 +694,7 @@ public class Obfuscation {
                 String avd = findAvailableDevice();
                 int port = findAvailablePort();
                 try {
-                    runApk(EventCommandFactory.getCommand(eventType).getCommand(), "unmodified", i, pathToLogs, avd, port);
+                    runApk(EventCommandFactory.getEventCommand(eventType).getCommand(), "unmodified", i, pathToLogs, avd, port);
                 } catch (Exception e) {
                     synchronized (threadsUsingDevice) {
                         if (threadsUsingDevice > 0)

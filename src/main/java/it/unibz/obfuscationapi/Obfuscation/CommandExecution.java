@@ -1,6 +1,9 @@
 package it.unibz.obfuscationapi.Obfuscation;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
@@ -29,6 +32,7 @@ public class CommandExecution {
             data=".*?\\..*?\\..*?"
             data="android\\.intent\\.category\\.LAUNCHER")""";
     public static final String os = System.getProperty("os.name").toLowerCase();
+    private static final boolean cleanUp = true;
 
     /**
      * Executes the script in the scripts folder to decompile the APK and generate the dumps of the dex files
@@ -83,7 +87,8 @@ public class CommandExecution {
     }
 
     /**
-     * Executes the script in the scripts folder to rebuild and sign the APK
+     * Executes the script in the scripts folder to rebuild and sign the APK, then if {@link CommandExecution#cleanUp}
+     * is true, it cleans up the directory, to avoid stacking the obfuscation techniques
      */
     public static void rebuildAPK(String appName, String obfuscation) throws IOException, InterruptedException {
         String errorLog;
@@ -108,6 +113,9 @@ public class CommandExecution {
             throw new RuntimeException("Unsupported OS: " + os);
         }
         reportError(errorLog, retCode, command, "rebuildAPK");
+        if (cleanUp) {
+            cleanUp(appName);
+        }
     }
 
     /**
@@ -150,20 +158,20 @@ public class CommandExecution {
     /**
      * Cleans up the decompiled directory deleting all added modifications because of the previous transformations
      */
-    public static void cleanUp() throws IOException, InterruptedException {
+    public static void cleanUp(String appName) throws IOException, InterruptedException {
         String errorLog;
         int retCode;
         String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "cleanUp.cmd"};
+            String[] cmd = {"cmd.exe", "/c", "cleanUp.cmd", appName};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];
             command = String.join(" ", cmd);
         } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
             File file = new File(Paths.get("scripts", "unix").toString());
-            String[] cmd = {"bash", "cleanUp.sh"};
+            String[] cmd = {"bash", "cleanUp.sh", appName};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];
@@ -210,20 +218,22 @@ public class CommandExecution {
     }
 
     /**
-     * Starts the device loading the initial snapshot, installs the APK and grants (if any) the needed permissions to
-     * run the application
+     * Turns on the device on the specified port, then installs the APK, runs it, collects the log, stores it in the
+     * specified folder and closes the emulator
      *
-     * @param appName name of the APK
-     * @param avd     name of the emulated device
-     * @param port    port of the emulated device
+     * @param pathToApk path to the APK file to install
+     * @param avd       name of the emulated device
+     * @param pathToLog path where to store the log
+     * @param port      port for the emulator
+     * @param aEScript  script to trigger the event
      */
-    public static void installAPK(String appName, String avd, int port) throws IOException, InterruptedException {
+    public static void generateLog(String pathToApk, String avd, String pathToLog, int port, String aEScript) throws IOException, InterruptedException {
         String errorLog;
         int retCode;
         String command;
         if (os.contains("win")) {
             File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "installAPK.cmd", appName, avd};
+            String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pathToApk, avd, pathToLog, String.valueOf(port), aEScript};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];
@@ -235,75 +245,7 @@ public class CommandExecution {
             else
                 path = path.resolve("linux");
             File file = new File(path.toString());
-            String[] cmd = {"bash", "installAPK.sh", appName, avd, String.valueOf(port)};
-            String[] ret = execCommand(cmd, file);
-            retCode = Integer.parseInt(ret[0]);
-            errorLog = ret[1];
-            command = String.join(" ", cmd);
-        } else {
-            throw new RuntimeException("Unsupported OS: " + os);
-        }
-        reportError(errorLog, retCode, command, "installAPK");
-    }
-
-    /**
-     * Needs to be executed when the device is turned on (after executing installAPK)
-     * Runs the script that starts the application attaching strace to it, records the execution after sending an event
-     * (if any), saves the log in the specified file and closes the emulator without saving
-     *
-     * @param pathToApk    path to the APK file
-     * @param pathToLog    path where we want to store the log locally
-     * @param port         port of the emulated device
-     * @param aEScript     script that is executed by adb to trigger an event
-     */
-    public static void generateLog(String pathToApk, String pathToLog, int port, String aEScript) throws IOException, InterruptedException {
-        String errorLog;
-        int retCode;
-        String command;
-        if (os.contains("win")) {
-            File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "generateLog.cmd", pathToApk, pathToLog, String.valueOf(port), aEScript};
-            String[] ret = execCommand(cmd, file);
-            retCode = Integer.parseInt(ret[0]);
-            errorLog = ret[1];
-            command = String.join(" ", cmd);
-        } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-            Path path = Paths.get("scripts", "unix");
-            if (os.contains("mac"))
-                path = path.resolve("mac");
-            else
-                path = path.resolve("linux");
-            File file = new File(path.toString());
-            String[] cmd = {"bash", "generateLog.sh", pathToApk, pathToLog, String.valueOf(port), aEScript};
-            String[] ret = execCommand(cmd, file);
-            retCode = Integer.parseInt(ret[0]);
-            errorLog = ret[1];
-            command = String.join(" ", cmd);
-        } else {
-            throw new RuntimeException("Unsupported OS: " + os);
-        }
-        reportError(errorLog, retCode, command, "generateLog");
-    }
-
-    public static void together(String pathToApk, String avd, String pathToLog, int port, String aEScript) throws IOException, InterruptedException {
-        String errorLog;
-        int retCode;
-        String command;
-        if (os.contains("win")) {
-            File file = new File(Paths.get("scripts", "win").toString());
-            String[] cmd = {"cmd.exe", "/c", "together.cmd", pathToApk, avd, pathToLog, String.valueOf(port), aEScript};
-            String[] ret = execCommand(cmd, file);
-            retCode = Integer.parseInt(ret[0]);
-            errorLog = ret[1];
-            command = String.join(" ", cmd);
-        } else if (os.contains("mac") || os.contains("nix") || os.contains("nux") || os.contains("aix")) {
-            Path path = Paths.get("scripts", "unix");
-            if (os.contains("mac"))
-                path = path.resolve("mac");
-            else
-                path = path.resolve("linux");
-            File file = new File(path.toString());
-            String[] cmd = {"bash", "together.sh", pathToApk, avd, pathToLog, String.valueOf(port), aEScript};
+            String[] cmd = {"bash", "generateLog.sh", pathToApk, avd, pathToLog, String.valueOf(port), aEScript};
             String[] ret = execCommand(cmd, file);
             retCode = Integer.parseInt(ret[0]);
             errorLog = ret[1];
